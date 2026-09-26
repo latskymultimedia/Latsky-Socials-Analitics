@@ -9,6 +9,7 @@ import {
   Facebook, 
   Share2 
 } from 'lucide-react';
+import { TikTokIcon } from './icons/TikTokIcon';
 import { PlatformSummaryRow, PlatformType, SocialReportData } from '../types/report';
 import { formatNumber, formatPercent, getPlatformColor } from '../utils/formatters';
 
@@ -17,6 +18,8 @@ interface CrossPlatformTableProps {
   isEditing?: boolean;
   onUpdateTable?: (table: PlatformSummaryRow[]) => void;
   onUpdateInsight?: (insight: string) => void;
+  selectedPlatforms?: PlatformType[];
+  onTogglePlatform?: (platform: PlatformType) => void;
 }
 
 export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
@@ -24,6 +27,8 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
   isEditing = false,
   onUpdateTable,
   onUpdateInsight,
+  selectedPlatforms,
+  onTogglePlatform,
 }) => {
   const table = report.crossPlatformOverview.summaryTable;
   const highlight = report.crossPlatformOverview.highlightInsight;
@@ -41,6 +46,8 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
         return <Linkedin className="w-4 h-4 text-sky-700" />;
       case 'facebook':
         return <Facebook className="w-4 h-4 text-blue-600" />;
+      case 'tiktok':
+        return <TikTokIcon className="w-4 h-4 text-stone-900" />;
       default:
         return <Share2 className="w-4 h-4 text-stone-600" />;
     }
@@ -110,10 +117,26 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
                   {/* Platform column */}
                   <td className="px-4 py-3.5 whitespace-nowrap font-medium text-stone-900">
                     <div className="flex items-center gap-2.5">
+                      {selectedPlatforms && onTogglePlatform && (
+                        <input
+                          type="checkbox"
+                          title="Include in executive summary stats"
+                          checked={selectedPlatforms.includes(row.platform)}
+                          onChange={() => onTogglePlatform(row.platform)}
+                          className="rounded border-stone-300 text-stone-900 focus:ring-stone-500 w-3.5 h-3.5 print:hidden cursor-pointer"
+                        />
+                      )}
                       <div className={`p-1.5 rounded-md ${colors.bg} border ${colors.border}`}>
                         {getPlatformIcon(row.platform)}
                       </div>
-                      <span className="font-semibold text-stone-900">{row.platformLabel}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-stone-900">{row.platformLabel}</span>
+                        {selectedPlatforms && !selectedPlatforms.includes(row.platform) && (
+                          <span className="text-[9px] uppercase font-bold text-stone-400 bg-stone-100 px-1 py-0.2 rounded print:hidden">
+                            Excluded from summary
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
 

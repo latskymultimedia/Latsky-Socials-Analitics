@@ -165,6 +165,46 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
     }
   };
 
+  const handleRunFastSynthesis = async () => {
+    setIsAnalyzing(true);
+    setError(null);
+    setAnalysisStep('Synthesizing agency report from screenshot data...');
+
+    try {
+      const payload = {
+        clientName: clientName.trim() || 'Client Brand',
+        clientSubtitle: clientSubtitle.trim(),
+        reportPeriod: reportPeriod.trim() || 'Current Month',
+        goals: goals.trim(),
+        notes: notes.trim(),
+        platforms: Array.from(new Set(screenshots.map((s) => s.platform).filter((p) => p !== 'general'))),
+        imageCount: screenshots.length,
+      };
+
+      const response = await fetch('/api/synthesize-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to synthesize report.');
+      }
+
+      if (data.report) {
+        onReportGenerated(data.report, screenshots);
+        onClose();
+      }
+    } catch (err: any) {
+      console.error('Fast synthesis error:', err);
+      setError(err.message || 'Failed to synthesize report.');
+    } finally {
+      setIsAnalyzing(false);
+      setAnalysisStep('');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 print:hidden">
       <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full border border-stone-200 overflow-hidden flex flex-col max-h-[92vh]">
@@ -202,13 +242,33 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-6">
           
-          {/* Error Message */}
+          {/* Error Message with Smart Recovery Options */}
           {error && (
-            <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold">Analysis Failed</p>
-                <p className="mt-0.5">{error}</p>
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-stone-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                <div>
+                  <p className="font-bold text-stone-900">Notice During Generation</p>
+                  <p className="mt-0.5 text-stone-700 leading-relaxed">{error}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleRunFastSynthesis}
+                  disabled={isAnalyzing}
+                  className="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-lg text-xs transition"
+                >
+                  Use Smart Synthesis
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRunAnalysis}
+                  disabled={isAnalyzing}
+                  className="px-3 py-1.5 border border-stone-300 bg-white hover:bg-stone-100 text-stone-700 font-semibold rounded-lg text-xs transition"
+                >
+                  Retry AI
+                </button>
               </div>
             </div>
           )}
@@ -394,9 +454,17 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isAnalyzing}
-              className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-stone-900 transition"
+              className="px-3.5 py-2 text-xs font-medium text-stone-600 hover:text-stone-900 transition"
             >
               Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleRunFastSynthesis}
+              disabled={isAnalyzing || screenshots.length === 0}
+              className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-stone-300 bg-white text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Instant Synthesis
             </button>
             <button
               type="button"

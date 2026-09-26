@@ -13,6 +13,7 @@ import {
   Youtube,
   Linkedin
 } from 'lucide-react';
+import { TikTokIcon } from './icons/TikTokIcon';
 import { REQUIRED_SCREENGRAB_CHECKLIST, ScreengrabPromptItem } from '../types/screengrabPrompts';
 import { PlatformType, UploadedScreenshot } from '../types/report';
 
@@ -39,6 +40,8 @@ export const ScreengrabGuide: React.FC<ScreengrabGuideProps> = ({
         return <Linkedin className="w-4 h-4 text-sky-700" />;
       case 'facebook':
         return <Facebook className="w-4 h-4 text-blue-600" />;
+      case 'tiktok':
+        return <TikTokIcon className="w-4 h-4 text-stone-900" />;
       default:
         return <Layers className="w-4 h-4 text-stone-600" />;
     }

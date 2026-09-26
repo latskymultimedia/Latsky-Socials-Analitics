@@ -98,5 +98,31 @@ export const REQUIRED_SCREENGRAB_CHECKLIST: ScreengrabPromptItem[] = [
       'Top Document/Carousel vs Native Post engagement'
     ],
     exampleInstruction: 'LinkedIn Company Page > Analytics > Visitors (Demographics view) + Content (Post table).'
+  },
+  {
+    id: 'tt-analytics-overview',
+    platform: 'tiktok',
+    title: 'TikTok Studio: Video Views, Profile Views & Net Followers',
+    description: 'TikTok Studio / Creator Center > Analytics > Overview (Last 28 or 30 days).',
+    requiredMetricTargets: [
+      'Total Video Views & Comparative Trend Curve',
+      'Profile Views & Conversion to Follows',
+      'Net New Followers Gained',
+      'Total Likes, Comments & Shares Across Uploads'
+    ],
+    exampleInstruction: 'tiktok.com/analytics or Creator Center > Analytics > Overview (Date range: Last 28 Days).'
+  },
+  {
+    id: 'tt-retention-fyp-split',
+    platform: 'tiktok',
+    title: 'TikTok Analytics: Watch Time, Completion Rate & FYP %',
+    description: 'TikTok Analytics > Content tab > Individual Top Video Analytics.',
+    requiredMetricTargets: [
+      'Average Watch Time & Total Play Time',
+      'Watched Full Video (Completion Rate %)',
+      'For You Page (FYP) vs Personal Profile Traffic Ratio',
+      'Audience Retention Curve & Drop-off Points'
+    ],
+    exampleInstruction: 'Creator Center > Content tab > Click top video > View full Analytics retention curve.'
   }
 ];

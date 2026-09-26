@@ -91,6 +91,50 @@ export interface LinkedInTopPost {
   whyItWorked: string;
 }
 
+export interface TikTokFormatMetric {
+  format: string; // 'Short Clips (<15s)', 'Mid-form Narrative (30-60s)', 'Sound-Driven Trends', 'Masterclasses'
+  count: number;
+  avgViews: number;
+  avgEngagement: number;
+}
+
+export interface TikTokTopPost {
+  id: string;
+  title: string;
+  views: number;
+  likes: number;
+  shares: number;
+  comments: number;
+  engagementRate: number;
+  screenshotUrl?: string;
+  whyItWorked: string;
+}
+
+export interface TikTokReport {
+  followers: number;
+  netGrowth: number;
+  videoViews: number;
+  profileViews: number;
+  likes: number;
+  shares: number;
+  comments: number;
+  engagementRate: number;
+  postFormats: TikTokFormatMetric[];
+  videoMetrics: {
+    avgWatchTimeSec: number;
+    completionRatePercent: number;
+    fypTrafficPercent: number;
+    retentionInsight: string;
+  };
+  topPosts: TikTokTopPost[];
+  demographics: {
+    topLocations: string[];
+    topAgeGender: string;
+    summary: string;
+  };
+  growthPlaybook?: PlatformGrowthPlaybook;
+}
+
 export interface CrossPlatformTopPost {
   rank: number;
   title: string;
@@ -124,6 +168,67 @@ export interface ActionRecommendation {
   recommendation: string;
   expectedOutcome: string;
   platform: string;
+}
+
+export interface TacticalSuggestion {
+  id: string;
+  field: 'subs' | 'views' | 'comments' | 'algorithm_news' | 'format';
+  label: string;
+  tactic: string;
+  expectedImpact: string;
+}
+
+export interface PlatformGrowthPlaybook {
+  // 1. How to get more subs / follower conversion
+  subsStrategy: {
+    conversionHook: string;
+    profileBioTweak: string;
+    leadMagnetOrSeries: string;
+    keyAction: string;
+  };
+  // 2. How to get more views / reach acceleration
+  viewsStrategy: {
+    viralHookTemplate: string;
+    retentionTrigger: string;
+    algorithmDistributionHack: string;
+    keyAction: string;
+  };
+  // 3. How to spark high-intent comments & conversations
+  commentsStrategy: {
+    discussionPrompt: string;
+    pinnedCommentPlay: string;
+    engagementVelocityTactic: string;
+    keyAction: string;
+  };
+  // 4. Current Platform Updates & Algorithm News
+  algorithmUpdatesNews: {
+    latestUpdate: string;
+    impactOnBrand: string;
+    tacticalPivot: string;
+  };
+  // 5. Granular suggested actions added in specific fields
+  suggestions: TacticalSuggestion[];
+}
+
+export interface IndustryWebIntel {
+  industryName: string;
+  scrapedAt: string;
+  source: 'firecrawl' | 'firecrawl_live' | 'ai_grounded';
+  sourcesScraped: string[];
+  industryOverview: string;
+  subGrowthPlaybook: string;
+  viewsAndReachPlaybook: string;
+  commentsAndDebatesPlaybook: string;
+  socialAlgorithmNews2026: {
+    platform: string;
+    newsHeadline: string;
+    strategicTakeaway: string;
+  }[];
+  trendingHooksAndFormats: {
+    formatName: string;
+    hookPattern: string;
+    whyItWorksInThisIndustry: string;
+  }[];
 }
 
 export interface SocialReportData {
@@ -184,6 +289,7 @@ export interface SocialReportData {
       topAgeGender: string;
       summary: string;
     };
+    growthPlaybook?: PlatformGrowthPlaybook;
   };
 
   instagram: {
@@ -198,6 +304,7 @@ export interface SocialReportData {
     storyCompletionRate: number;
     nonFollowerDiscoveryRate: number;
     topPosts: InstagramTopPost[];
+    growthPlaybook?: PlatformGrowthPlaybook;
   };
 
   youtube: {
@@ -213,6 +320,7 @@ export interface SocialReportData {
     trafficSources: YouTubeTrafficSource[];
     topVideos: YouTubeTopVideo[];
     retentionDropOffInsight: string;
+    growthPlaybook?: PlatformGrowthPlaybook;
   };
 
   linkedin: {
@@ -225,7 +333,10 @@ export interface SocialReportData {
     contentTypes: LinkedInContentType[];
     seniorityDemographics: { title: string; percentage: number }[];
     topPosts: LinkedInTopPost[];
+    growthPlaybook?: PlatformGrowthPlaybook;
   };
+
+  tiktok?: TikTokReport;
 
   // 5. Content Performance Deep-Dive
   contentPerformance: {
@@ -261,6 +372,9 @@ export interface SocialReportData {
     contentCalendarDirection: string;
     testingPriorities: string[];
   };
+
+  // Live Scraped Industry Intelligence & Trend Radar
+  industryIntel?: IndustryWebIntel;
 
   // Uploaded raw screengrabs
   uploadedScreenshots: UploadedScreenshot[];

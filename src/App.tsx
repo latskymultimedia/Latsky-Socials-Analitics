@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { verandertReport, artisanRetreatReport } from './data/mockReports';
-import { PlatformType, SocialReportData, UploadedScreenshot, CompetitorBenchmark } from './types/report';
+import { 
+  PlatformType, 
+  SocialReportData, 
+  UploadedScreenshot, 
+  CompetitorBenchmark, 
+  IndustryWebIntel, 
+  PlatformGrowthPlaybook 
+} from './types/report';
 import { Header } from './components/Header';
 import { ReportEditor } from './components/ReportEditor';
 import { AiAnalysisModal } from './components/AiAnalysisModal';
@@ -16,6 +23,7 @@ import { ContentPerformanceSection } from './components/ContentPerformanceSectio
 import { AudienceAndBenchmarkSection } from './components/AudienceAndBenchmarkSection';
 import { RecommendationsSection } from './components/RecommendationsSection';
 import { ScreengrabsAppendix } from './components/ScreengrabsAppendix';
+import { ExportModal } from './components/ExportModal';
 import { 
   saveSessionToLaptop, 
   parseSessionFile, 
@@ -23,7 +31,7 @@ import {
   loadCurrentReportFromStorage, 
   generateExecutiveMarkdown 
 } from './utils/sessionStorage';
-import { CheckCircle2, AlertCircle, X, Layers, Sparkles } from 'lucide-react';
+import { CheckCircle2, AlertCircle, X, Layers, Sparkles, Globe, Users, Eye, Share2, ExternalLink } from 'lucide-react';
 
 export default function App() {
   const [report, setReport] = useState<SocialReportData>(() => {
@@ -37,7 +45,28 @@ export default function App() {
   const [isFirecrawlModalOpen, setIsFirecrawlModalOpen] = useState<boolean>(false);
   const [isCaptureGuideOpen, setIsCaptureGuideOpen] = useState<boolean>(false);
   const [isGrowthRoadmapOpen, setIsGrowthRoadmapOpen] = useState<boolean>(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Platform checkbox selection for Executive Summary and overview stats
+  const [selectedSummaryPlatforms, setSelectedSummaryPlatforms] = useState<PlatformType[]>([
+    'instagram',
+    'youtube',
+    'linkedin',
+    'facebook',
+    'tiktok',
+  ]);
+
+  const handleToggleSummaryPlatform = (platformId: PlatformType) => {
+    setSelectedSummaryPlatforms((prev) => {
+      if (prev.includes(platformId)) {
+        if (prev.length === 1) return prev; // Keep at least one platform selected
+        return prev.filter((p) => p !== platformId);
+      } else {
+        return [...prev, platformId];
+      }
+    });
+  };
 
   // Auto-save to local storage on changes
   useEffect(() => {
@@ -114,6 +143,27 @@ export default function App() {
     showToast(`Added ${benchmark.competitor} to Section 07 (Competitive Benchmarks).`);
   };
 
+  const handleApplyIndustryIntel = (
+    intel: IndustryWebIntel,
+    playbooks?: { [k in PlatformType]?: PlatformGrowthPlaybook }
+  ) => {
+    setReport((prev) => {
+      const updated: SocialReportData = {
+        ...prev,
+        industryIntel: intel,
+        lastModified: new Date().toISOString(),
+      };
+      if (playbooks) {
+        if (playbooks.instagram) updated.instagram = { ...updated.instagram, growthPlaybook: playbooks.instagram };
+        if (playbooks.youtube) updated.youtube = { ...updated.youtube, growthPlaybook: playbooks.youtube };
+        if (playbooks.linkedin) updated.linkedin = { ...updated.linkedin, growthPlaybook: playbooks.linkedin };
+        if (playbooks.facebook) updated.facebook = { ...updated.facebook, growthPlaybook: playbooks.facebook };
+      }
+      return updated;
+    });
+    showToast(`Applied live industry web intelligence for "${intel.industryName}"!`);
+  };
+
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col font-sans">
       
@@ -137,6 +187,7 @@ export default function App() {
         onOpenFirecrawlModal={() => setIsFirecrawlModalOpen(true)}
         onOpenCaptureGuide={() => setIsCaptureGuideOpen(true)}
         onOpenGrowthRoadmap={() => setIsGrowthRoadmapOpen(true)}
+        onOpenExportModal={() => setIsExportModalOpen(true)}
         onSaveToLaptop={handleSaveToLaptop}
         onLoadFromLaptop={handleLoadFromLaptop}
         onLoadPreset={handleLoadPreset}
@@ -212,6 +263,7 @@ export default function App() {
             platform={activeReportView}
             onBackToOverall={() => setActiveReportView('overall')}
             onSaveToLaptop={handleSaveToLaptop}
+            onOpenExportModal={() => setIsExportModalOpen(true)}
           />
         ) : (
           <>
@@ -247,6 +299,8 @@ export default function App() {
             <ExecutiveSummarySection
               report={report}
               isEditing={isEditing}
+              selectedPlatforms={selectedSummaryPlatforms}
+              onSelectPlatforms={setSelectedSummaryPlatforms}
               onUpdate={(summaryUpdate) =>
                 handleUpdateReport({
                   executiveSummary: { ...report.executiveSummary, ...summaryUpdate },
@@ -269,6 +323,8 @@ export default function App() {
             <CrossPlatformTable
               report={report}
               isEditing={isEditing}
+              selectedPlatforms={selectedSummaryPlatforms}
+              onTogglePlatform={handleToggleSummaryPlatform}
               onUpdateTable={(table) =>
                 handleUpdateReport({
                   crossPlatformOverview: {
@@ -286,6 +342,119 @@ export default function App() {
                 })
               }
             />
+
+            {/* Live Web Industry Intelligence & 2026 Trend Radar Banner */}
+            {report.industryIntel ? (
+              <section className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white rounded-xl p-6 sm:p-7 shadow-md border border-stone-800 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-750 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-orange-600 text-white rounded-lg">
+                      <Globe className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-300 bg-orange-950/80 border border-orange-700/60 px-2 py-0.5 rounded">
+                          FIRECRAWL LIVE INDUSTRY INTEL
+                        </span>
+                        <span className="text-xs text-stone-400">
+                          {report.industryIntel.source === 'firecrawl_live' ? 'Live Web Crawled' : 'Synthesized Intelligence'}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-bold text-white tracking-tight mt-0.5">
+                        {report.industryIntel.industryName} · Trend Radar & Playbook
+                      </h3>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsFirecrawlModalOpen(true)}
+                    className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-xs shrink-0"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                    <span>Re-Scrape Live Web</span>
+                  </button>
+                </div>
+
+                <p className="text-xs text-stone-300 leading-relaxed">
+                  {report.industryIntel.industryOverview}
+                </p>
+
+                {/* 3 Pillars for Subs, Views, Comments in this industry */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                  <div className="p-3.5 rounded-lg bg-stone-800/80 border border-stone-700 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                      <Users className="w-3.5 h-3.5" />
+                      <span>How to Get More Subs</span>
+                    </div>
+                    <p className="text-[11px] text-stone-300 leading-relaxed">
+                      {report.industryIntel.subGrowthPlaybook}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-stone-800/80 border border-stone-700 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-sky-400 uppercase tracking-wider">
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>How to Get More Views</span>
+                    </div>
+                    <p className="text-[11px] text-stone-300 leading-relaxed">
+                      {report.industryIntel.viewsAndReachPlaybook}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-stone-800/80 border border-stone-700 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-purple-400 uppercase tracking-wider">
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>How to Spark Comments</span>
+                    </div>
+                    <p className="text-[11px] text-stone-300 leading-relaxed">
+                      {report.industryIntel.commentsAndDebatesPlaybook}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Algorithm news callouts */}
+                {report.industryIntel.socialAlgorithmNews2026 && report.industryIntel.socialAlgorithmNews2026.length > 0 && (
+                  <div className="pt-2 border-t border-stone-750">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      <span>2026 Platform Algorithm News & Immediate Brand Impact:</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                      {report.industryIntel.socialAlgorithmNews2026.map((news, idx) => (
+                        <div key={idx} className="p-2.5 rounded-lg bg-stone-800/60 border border-stone-700/80 text-xs space-y-1">
+                          <span className="text-[10px] font-mono font-bold text-amber-300 uppercase">{news.platform}</span>
+                          <div className="font-semibold text-white text-[11px] leading-tight">{news.newsHeadline}</div>
+                          <div className="text-stone-400 text-[10px] leading-snug">{news.strategicTakeaway}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            ) : (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-orange-600 text-white rounded-lg shrink-0">
+                    <Globe className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-orange-950">
+                      Scrape Live Web Data for Customer Industry
+                    </h4>
+                    <p className="text-[11px] text-orange-800">
+                      Use Firecrawl to research how to get more subs, views, comments, and current 2026 social algorithm updates for this industry.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFirecrawlModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg shrink-0 transition"
+                >
+                  Launch Firecrawl Scraper
+                </button>
+              </div>
+            )}
 
             {/* 4. Platform-by-Platform Deep Dive */}
             <PlatformBreakdownSection
@@ -356,7 +525,9 @@ export default function App() {
         isOpen={isFirecrawlModalOpen}
         onClose={() => setIsFirecrawlModalOpen(false)}
         clientName={report.clientName}
+        defaultIndustry={report.industryIntel?.industryName || report.clientSubtitle || 'Commercial Film Production & Documentary Cinema'}
         onAddCompetitor={handleAddFirecrawlCompetitor}
+        onApplyIndustryIntel={handleApplyIndustryIntel}
       />
 
       {/* Footer */}
@@ -396,14 +567,22 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={() => window.print()}
-              className="hover:text-stone-900 underline underline-offset-2"
+              onClick={() => setIsExportModalOpen(true)}
+              className="hover:text-stone-900 underline underline-offset-2 font-semibold text-stone-900"
             >
-              Export PDF
+              Export PDF / Studio
             </button>
           </div>
         </div>
       </footer>
+
+      {/* Export Studio Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        report={report}
+        activePlatform={activeReportView}
+      />
 
     </div>
   );

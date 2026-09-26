@@ -60,12 +60,44 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({
         {/* Client Subtitle */}
         <div>
           <label className="block text-xs font-semibold text-stone-400 mb-1">
-            Client Subtitle / Sector
+            Client Subtitle / Tagline
           </label>
           <input
             type="text"
             value={report.clientSubtitle}
             onChange={(e) => onUpdateReport({ clientSubtitle: e.target.value })}
+            className="w-full text-xs px-3 py-2 rounded-lg bg-stone-800 border border-stone-700 text-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+          />
+        </div>
+
+        {/* Industry / Vertical */}
+        <div>
+          <label className="block text-xs font-semibold text-stone-400 mb-1">
+            Industry / Vertical (Firecrawl Radar)
+          </label>
+          <input
+            type="text"
+            value={report.industryIntel?.industryName || ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              onUpdateReport({
+                industryIntel: report.industryIntel
+                  ? { ...report.industryIntel, industryName: val }
+                  : {
+                      industryName: val,
+                      scrapedAt: new Date().toISOString(),
+                      source: 'ai_grounded',
+                      sourcesScraped: [],
+                      industryOverview: '',
+                      subGrowthPlaybook: '',
+                      viewsAndReachPlaybook: '',
+                      commentsAndDebatesPlaybook: '',
+                      socialAlgorithmNews2026: [],
+                      trendingHooksAndFormats: [],
+                    }
+              });
+            }}
+            placeholder="e.g. Commercial Cinema, B2B SaaS"
             className="w-full text-xs px-3 py-2 rounded-lg bg-stone-800 border border-stone-700 text-white focus:outline-none focus:ring-1 focus:ring-amber-400"
           />
         </div>

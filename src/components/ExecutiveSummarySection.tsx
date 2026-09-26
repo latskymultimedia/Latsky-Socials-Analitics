@@ -1,20 +1,133 @@
-import React from 'react';
-import { ArrowUpRight, ArrowDownRight, Award, AlertTriangle, TrendingUp } from 'lucide-react';
-import { SocialReportData } from '../types/report';
+import React, { useState } from 'react';
+import { 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  Award, 
+  AlertTriangle, 
+  TrendingUp,
+  CheckSquare,
+  Square,
+  SlidersHorizontal,
+  Instagram,
+  Youtube,
+  Linkedin,
+  Facebook,
+  Sparkles
+} from 'lucide-react';
+import { TikTokIcon } from './icons/TikTokIcon';
+import { PlatformType, SocialReportData } from '../types/report';
 import { formatNumber, formatPercent } from '../utils/formatters';
 
 interface ExecutiveSummarySectionProps {
   report: SocialReportData;
   isEditing?: boolean;
   onUpdate?: (data: Partial<SocialReportData['executiveSummary']>) => void;
+  selectedPlatforms?: PlatformType[];
+  onSelectPlatforms?: (platforms: PlatformType[]) => void;
 }
 
 export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = ({
   report,
   isEditing = false,
   onUpdate,
+  selectedPlatforms: controlledPlatforms,
+  onSelectPlatforms,
 }) => {
   const summary = report.executiveSummary;
+  const summaryTable = report.crossPlatformOverview?.summaryTable || [];
+
+  // Internal selection state if not controlled externally
+  const [internalPlatforms, setInternalPlatforms] = useState<PlatformType[]>([
+    'instagram',
+    'youtube',
+    'linkedin',
+    'facebook',
+    'tiktok',
+  ]);
+
+  const activePlatforms = controlledPlatforms || internalPlatforms;
+
+  const platformDefinitions: { id: PlatformType; label: string; icon: React.ReactNode; color: string }[] = [
+    { id: 'instagram', label: 'Instagram', icon: <Instagram className="w-3.5 h-3.5 text-rose-600" />, color: 'text-rose-700' },
+    { id: 'youtube', label: 'YouTube', icon: <Youtube className="w-3.5 h-3.5 text-red-600" />, color: 'text-red-700' },
+    { id: 'linkedin', label: 'LinkedIn', icon: <Linkedin className="w-3.5 h-3.5 text-sky-700" />, color: 'text-sky-800' },
+    { id: 'facebook', label: 'Facebook', icon: <Facebook className="w-3.5 h-3.5 text-blue-600" />, color: 'text-blue-700' },
+    { id: 'tiktok', label: 'TikTok', icon: <TikTokIcon className="w-3.5 h-3.5 text-stone-900" />, color: 'text-stone-900' },
+  ];
+
+  const handleTogglePlatform = (platformId: PlatformType) => {
+    let next: PlatformType[];
+    if (activePlatforms.includes(platformId)) {
+      if (activePlatforms.length === 1) return; // Keep at least one platform selected
+      next = activePlatforms.filter((p) => p !== platformId);
+    } else {
+      next = [...activePlatforms, platformId];
+    }
+    if (onSelectPlatforms) {
+      onSelectPlatforms(next);
+    } else {
+      setInternalPlatforms(next);
+    }
+  };
+
+  const handleSelectAll = () => {
+    const all: PlatformType[] = ['instagram', 'youtube', 'linkedin', 'facebook', 'tiktok'];
+    if (onSelectPlatforms) {
+      onSelectPlatforms(all);
+    } else {
+      setInternalPlatforms(all);
+    }
+  };
+
+  const handleSelectOnly = (platformId: PlatformType) => {
+    const only: PlatformType[] = [platformId];
+    if (onSelectPlatforms) {
+      onSelectPlatforms(only);
+    } else {
+      setInternalPlatforms(only);
+    }
+  };
+
+  const isAllSelected = activePlatforms.length === platformDefinitions.length;
+
+  // Filtered rows for active platforms
+  const filteredRows = summaryTable.filter((r) => activePlatforms.includes(r.platform));
+
+  // Dynamic calculations based on selected platforms
+  const calculatedReach = isAllSelected
+    ? summary.overallReach
+    : filteredRows.reduce((acc, r) => acc + (r.reach || 0), 0);
+
+  const calculatedReachMoM = isAllSelected
+    ? summary.overallReachPrevDelta
+    : filteredRows.length > 0
+    ? Number(
+        (
+          filteredRows.reduce((acc, r) => acc + (r.reachDelta || 0), 0) /
+          filteredRows.length
+        ).toFixed(1)
+      )
+    : 0;
+
+  const calculatedEngagementRate = isAllSelected
+    ? summary.overallEngagementRate
+    : filteredRows.length > 0
+    ? Number(
+        (
+          filteredRows.reduce((acc, r) => acc + (r.engagementRate || 0), 0) /
+          filteredRows.length
+        ).toFixed(1)
+      )
+    : 0;
+
+  const calculatedNetGrowth = filteredRows.reduce(
+    (acc, r) => acc + (r.followersDelta || 0),
+    0
+  );
+
+  const primaryGrowthEngineRow = filteredRows.length > 0
+    ? filteredRows.reduce((prev, curr) => (curr.reach > prev.reach ? curr : prev), filteredRows[0])
+    : null;
 
   const handleTakeawayChange = (index: number, value: string) => {
     if (!onUpdate) return;
@@ -45,7 +158,7 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
   };
 
   return (
-    <section className="bg-white rounded-xl border border-stone-200 shadow-xs p-6 sm:p-8 space-y-8 page-break-after">
+    <section className="bg-white rounded-xl border border-stone-200 shadow-xs p-6 sm:p-8 space-y-6 page-break-after">
       
       {/* Section Header */}
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between border-b border-stone-100 pb-4 gap-2">
@@ -62,30 +175,117 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
         </div>
       </div>
 
-      {/* High-Impact Stat Metrics Grid */}
+      {/* Interactive Platform Checkbox Setting Bar */}
+      <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2.5 print:hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-stone-600" />
+            <span className="text-xs font-bold text-stone-900 uppercase tracking-wider">
+              Choose Platform(s) for Executive Stats:
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className={`px-2 py-0.5 rounded font-semibold text-[11px] transition ${
+                isAllSelected
+                  ? 'bg-stone-900 text-white'
+                  : 'text-stone-600 hover:text-stone-900 bg-stone-200/70 hover:bg-stone-200'
+              }`}
+            >
+              All Platforms
+            </button>
+            <span className="text-stone-300">|</span>
+            <span className="text-[11px] text-stone-500">Quick isolate:</span>
+            {platformDefinitions.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleSelectOnly(p.id)}
+                className={`text-[11px] px-1.5 py-0.5 rounded transition ${
+                  activePlatforms.length === 1 && activePlatforms[0] === p.id
+                    ? 'font-bold bg-stone-300 text-stone-900'
+                    : 'text-stone-500 hover:text-stone-800'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Checkbox Pills */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-stone-200/80">
+          {platformDefinitions.map((plat) => {
+            const isChecked = activePlatforms.includes(plat.id);
+            return (
+              <label
+                key={plat.id}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition select-none ${
+                  isChecked
+                    ? 'bg-white border-stone-800 text-stone-900 shadow-xs ring-1 ring-stone-900/10'
+                    : 'bg-stone-100/60 border-stone-200 text-stone-400 hover:text-stone-700 hover:bg-stone-100'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => handleTogglePlatform(plat.id)}
+                  className="rounded border-stone-300 text-stone-900 focus:ring-stone-500 w-3.5 h-3.5"
+                />
+                <span className="shrink-0">{plat.icon}</span>
+                <span>{plat.label}</span>
+                {isChecked && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                )}
+              </label>
+            );
+          })}
+
+          <div className="ml-auto text-[11px] text-stone-500 font-medium">
+            {isAllSelected ? (
+              <span className="text-stone-600 font-semibold">
+                ✓ Showing combined stats across all 4 platforms
+              </span>
+            ) : (
+              <span className="text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-semibold">
+                Filter active: {activePlatforms.length} platform{activePlatforms.length > 1 ? 's' : ''} ({activePlatforms.map(p => platformDefinitions.find(d => d.id === p)?.label).join(' + ')})
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* High-Impact Stat Metrics Grid (Dynamically recalculates based on chosen platforms) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Total Cross-Platform Reach */}
+        {/* Total Audience Reach */}
         <div className="p-4 rounded-lg bg-stone-50 border border-stone-200">
           <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
-            Total Audience Reach
+            {isAllSelected ? 'Total Audience Reach' : 'Selected Platforms Reach'}
           </div>
           <div className="mt-1 text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight">
-            {formatNumber(summary.overallReach)}
+            {formatNumber(calculatedReach)}
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs">
-            <span className={`inline-flex items-center font-semibold ${summary.overallReachPrevDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-              {summary.overallReachPrevDelta >= 0 ? (
+            <span className={`inline-flex items-center font-semibold ${calculatedReachMoM >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+              {calculatedReachMoM >= 0 ? (
                 <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
               ) : (
                 <ArrowDownRight className="w-3.5 h-3.5 mr-0.5" />
               )}
-              {formatPercent(summary.overallReachPrevDelta, true)} MoM
+              {formatPercent(calculatedReachMoM, true)} MoM
             </span>
-            <span className="text-stone-300">·</span>
-            <span className="text-stone-500">
-              {formatPercent(summary.overallReachYoYDelta, true)} YoY
-            </span>
+            {isAllSelected && (
+              <>
+                <span className="text-stone-300">·</span>
+                <span className="text-stone-500">
+                  {formatPercent(summary.overallReachYoYDelta, true)} YoY
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -95,7 +295,7 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
             Avg. Engagement Rate
           </div>
           <div className="mt-1 text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight">
-            {summary.overallEngagementRate}%
+            {calculatedEngagementRate}%
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs">
             <span className={`inline-flex items-center font-semibold ${summary.overallEngagementPrevDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
@@ -107,7 +307,9 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
               {formatPercent(summary.overallEngagementPrevDelta, true)} MoM
             </span>
             <span className="text-stone-300">·</span>
-            <span className="text-stone-500">Industry avg ~2.4%</span>
+            <span className="text-stone-500">
+              {isAllSelected ? 'Baseline ~2.4%' : `${activePlatforms.length} channel avg`}
+            </span>
           </div>
         </div>
 
@@ -117,12 +319,10 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
             Net Community Growth
           </div>
           <div className="mt-1 text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight">
-            +{formatNumber(
-              report.crossPlatformOverview.summaryTable.reduce((acc, row) => acc + (row.followersDelta || 0), 0)
-            )}
+            +{formatNumber(calculatedNetGrowth)}
           </div>
           <div className="mt-2 text-xs text-stone-500 truncate">
-            Across {report.crossPlatformOverview.summaryTable.length} tracked channels
+            Across {activePlatforms.length} {activePlatforms.length === 1 ? 'channel' : 'selected channels'}
           </div>
         </div>
 
@@ -132,10 +332,10 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
             Primary Growth Engine
           </div>
           <div className="mt-1 text-base sm:text-lg font-bold text-stone-900 tracking-tight truncate">
-            {report.crossPlatformOverview.summaryTable.find(p => p.reach === Math.max(...report.crossPlatformOverview.summaryTable.map(r => r.reach)))?.platformLabel || 'Instagram & YouTube'}
+            {primaryGrowthEngineRow ? primaryGrowthEngineRow.platformLabel : 'Selected Platforms'}
           </div>
           <div className="mt-2 text-xs text-stone-500 truncate">
-            Highest net subscriber & video reach
+            {primaryGrowthEngineRow ? `${formatNumber(primaryGrowthEngineRow.reach)} reach · ${primaryGrowthEngineRow.engagementRate}% ER` : 'Top performer'}
           </div>
         </div>
 
@@ -259,3 +459,4 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
     </section>
   );
 };
+

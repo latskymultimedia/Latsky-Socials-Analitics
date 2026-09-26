@@ -34,9 +34,52 @@ export function getPlatformColor(platform: string): { bg: string; text: string; 
 
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
+    // If it's not an image (or SVG), fall back to standard reader
+    if (!file.type.startsWith('image/') || file.type.includes('svg')) {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Limit max dimension to 1600px for optimal speed and vision model comprehension
+        const maxDimension = 1600;
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        // Compress as JPEG 0.88 for crisp dashboard text with small payload size
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.88);
+        resolve(compressedBase64);
+      };
+      img.onerror = () => {
+        resolve(e.target?.result as string);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = (err) => reject(err);
     reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (error) => reject(error);
   });
 }
