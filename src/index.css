@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-stone-100 text-stone-900 antialiased selection:bg-stone-800 selection:text-white;
+  }
+}
+
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #1c1917 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  header, .print-hidden, button {
+    display: none !important;
+  }
+
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Allow top-level sections to break across pages naturally so all 8 sections print */
+  section {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+    box-shadow: none !important;
+    border: 1px solid #e7e5e4 !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  /* Prevent small individual metric cards and posts from breaking in half */
+  .grid > div,
+  .metric-card,
+  table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Force all platforms to be visible in print mode */
+  .print-force-visible {
+    display: block !important;
+    visibility: visible !important;
+  }
+}

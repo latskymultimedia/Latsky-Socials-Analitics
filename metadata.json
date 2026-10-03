@@ -1,0 +1,7 @@
+{
+  "name": "PulseAgency - In-Depth Social Media Client Reporting",
+  "description": "Agency-grade social media reporting suite: AI dashboard screenshot analysis, cross-platform metrics, client branding, session file saving/loading, and PDF export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
