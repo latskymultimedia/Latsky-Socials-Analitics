@@ -5,8 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    // Change base from '/' to './' so assets load correctly relative to index.html
-    base: '/Latsky-Socials-Analitics/',
+    // Set base to root '/' for Vercel deployment
+    base: '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
