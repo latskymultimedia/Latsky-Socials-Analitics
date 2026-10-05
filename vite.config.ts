@@ -3,10 +3,12 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
   return {
-    // Set base to root '/' for Vercel deployment
-    base: '/',
+    // For Vercel deployments (process.env.VERCEL), use root '/'
+    // For GitHub Pages build (command === 'build'), use repository subfolder
+    // In dev server (command === 'serve'), use root '/' for instant loading in AI Studio preview
+    base: process.env.VERCEL ? '/' : (command === 'build' ? '/Latsky-Socials-Analitics/' : '/'),
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

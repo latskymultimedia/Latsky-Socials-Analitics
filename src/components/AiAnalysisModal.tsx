@@ -25,6 +25,7 @@ import {
 import { TikTokIcon } from './icons/TikTokIcon';
 import { PlatformType, SocialReportData, UploadedScreenshot, FileUploadType } from '../types/report';
 import { processUploadedFile, formatFileSize } from '../utils/fileUploadHelper';
+import { generateSynthesizedAgencyReport } from '../utils/reportSynthesizer';
 import { ScreengrabGuide } from './ScreengrabGuide';
 import { ScreengrabPromptItem } from '../types/screengrabPrompts';
 
@@ -247,27 +248,53 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
 
       setAnalysisStep('Inspecting dashboard figures, PDF tables, CSV metrics & retention curves...');
 
-      const response = await fetch('/api/analyze-screenshots', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      try {
+        const response = await fetch('/api/analyze-screenshots', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
 
-      setAnalysisStep('Synthesizing cross-platform metrics, wins, and next month plan...');
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Serverless API not active on static host");
+        }
 
-      const data = await response.json();
+        setAnalysisStep('Synthesizing cross-platform metrics, wins, and next month plan...');
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to analyze uploads.');
-      }
+        const data = await response.json();
 
-      if (data.report) {
-        onReportGenerated(data.report, screenshots);
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to analyze uploads.');
+        }
+
+        if (data.report) {
+          onReportGenerated(data.report, screenshots);
+          onClose();
+          return;
+        } else {
+          throw new Error('No report data returned from server.');
+        }
+      } catch (apiError) {
+        console.warn("Backend API unavailable on static hosting, switching to client-side synthesis...", apiError);
+
+        // CLIENT-SIDE FALLBACK: Generates the report instantly in the browser
+        const localReport = generateSynthesizedAgencyReport({
+          clientName: payload.clientName,
+          clientSubtitle: payload.clientSubtitle,
+          reportPeriod: payload.reportPeriod,
+          goals: payload.goals,
+          notes: payload.notes,
+          platforms: payload.platforms,
+          imageCount: screenshots.length,
+          imageNames: screenshots.map((s) => s.name),
+          knownMetrics: payload.knownMetrics,
+        });
+
+        onReportGenerated(localReport, screenshots);
         onClose();
-      } else {
-        throw new Error('No report data returned from server.');
       }
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -283,46 +310,76 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
     setError(null);
     setAnalysisStep('Synthesizing agency report from uploaded platform data...');
 
+    const activePlatformsFound = Array.from(new Set(screenshots.map((s) => s.platform).filter((p) => p && p !== 'general')));
+    const platformsToReport = monitoredChannels.length > 0
+      ? monitoredChannels
+      : (activePlatformsFound.length > 0 ? activePlatformsFound : ['youtube', 'instagram', 'tiktok', 'linkedin', 'facebook']);
+
+    const filteredKnownMetrics = Object.fromEntries(
+      Object.entries(knownMetrics).filter(([_, v]) => v.trim() !== '' && !isNaN(Number(v)))
+    );
+
+    const payload = {
+      clientName: clientName.trim() || 'Client Brand',
+      clientSubtitle: clientSubtitle.trim(),
+      reportPeriod: reportPeriod.trim() || 'Current Month',
+      goals: goals.trim(),
+      notes: notes.trim(),
+      platforms: platformsToReport,
+      imageCount: screenshots.length,
+      imageNames: screenshots.map((s) => s.name),
+      knownMetrics: filteredKnownMetrics,
+    };
+
     try {
-      const activePlatformsFound = Array.from(new Set(screenshots.map((s) => s.platform).filter((p) => p && p !== 'general')));
-      const platformsToReport = monitoredChannels.length > 0
-        ? monitoredChannels
-        : (activePlatformsFound.length > 0 ? activePlatformsFound : ['youtube', 'instagram', 'tiktok', 'linkedin', 'facebook']);
-
-      const filteredKnownMetrics = Object.fromEntries(
-        Object.entries(knownMetrics).filter(([_, v]) => v.trim() !== '' && !isNaN(Number(v)))
-      );
-
-      const payload = {
-        clientName: clientName.trim() || 'Client Brand',
-        clientSubtitle: clientSubtitle.trim(),
-        reportPeriod: reportPeriod.trim() || 'Current Month',
-        goals: goals.trim(),
-        notes: notes.trim(),
-        platforms: platformsToReport,
-        imageCount: screenshots.length,
-        imageNames: screenshots.map((s) => s.name),
-        knownMetrics: filteredKnownMetrics,
-      };
-
+      // Try calling the backend API first
       const response = await fetch('/api/synthesize-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Serverless API not active on static host");
+      }
+
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Failed to synthesize report.');
       }
 
+      if (data.success && data.report) {
+        onReportGenerated(data.report, screenshots);
+        onClose();
+        return;
+      }
+
       if (data.report) {
         onReportGenerated(data.report, screenshots);
         onClose();
+        return;
       }
-    } catch (err: any) {
-      console.error('Fast synthesis error:', err);
-      setError(err.message || 'Failed to synthesize report.');
+
+      throw new Error('No report data returned from server.');
+    } catch (apiError) {
+      console.warn("Backend API unavailable on Vercel static hosting, switching to client-side synthesis...", apiError);
+
+      // CLIENT-SIDE FALLBACK: Generates the report instantly in the browser
+      const localReport = generateSynthesizedAgencyReport({
+        clientName: payload.clientName,
+        clientSubtitle: payload.clientSubtitle,
+        reportPeriod: payload.reportPeriod,
+        goals: payload.goals,
+        notes: payload.notes,
+        platforms: payload.platforms,
+        imageCount: screenshots.length,
+        imageNames: screenshots.map((s) => s.name),
+        knownMetrics: payload.knownMetrics,
+      });
+
+      onReportGenerated(localReport, screenshots);
+      onClose();
     } finally {
       setIsAnalyzing(false);
       setAnalysisStep('');

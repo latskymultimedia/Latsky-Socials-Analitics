@@ -1,6 +1,42 @@
 import { FileUploadType, PlatformType, UploadedScreenshot } from '../types/report';
 import { fileToBase64 } from './formatters';
 
+// Helper to compress and downscale images before sending to AI analysis
+export function compressImage(file: File, maxWidth = 1200, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(event.target?.result as string); // Fallback to original if context fails
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        // Convert to compressed JPEG data URL
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -44,6 +80,14 @@ export async function processUploadedFile(file: File, targetPlatform?: PlatformT
     // For CSV, create dataUrl representation for consistency
     const encoded = encodeURIComponent(textContent);
     dataUrl = `data:text/csv;charset=utf-8,${encoded}`;
+  } else if (fileType === 'image') {
+    // Automatically compress and downscale images before storing in state or sending to AI analysis
+    try {
+      dataUrl = await compressImage(file);
+    } catch (compressionErr) {
+      console.warn('Image compression fallback to raw base64:', compressionErr);
+      dataUrl = await fileToBase64(file);
+    }
   } else {
     dataUrl = await fileToBase64(file);
   }

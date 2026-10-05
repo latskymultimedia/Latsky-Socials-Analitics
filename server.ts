@@ -1,6 +1,7 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
@@ -165,6 +166,14 @@ async function startServer() {
 
   app.use(express.json({ limit: '60mb' }));
   app.use(express.urlencoded({ extended: true, limit: '60mb' }));
+
+  // Support both root and GitHub Pages subfolder prefix in dev / preview
+  app.use((req, _res, next) => {
+    if (req.url.startsWith('/Latsky-Socials-Analitics/')) {
+      req.url = req.url.replace('/Latsky-Socials-Analitics/', '/');
+    }
+    next();
+  });
 
   app.get('/api/health', (_req, res) => {
     res.json({
@@ -782,10 +791,24 @@ Produce strictly valid JSON with this exact schema:
       appType: 'spa'
     });
     app.use(vite.middlewares);
+
+    app.get('*', async (req, res, next) => {
+      try {
+        const url = req.originalUrl;
+        let template = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e: any) {
+        if (vite) vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
   }
 
   const server = app.listen(PORT, HOST, () => {
     console.log(`Latsky Socials server running on http://${HOST}:${PORT}`);
+    console.log(`  ➜  Local:   http://localhost:${PORT}/`);
+    console.log(`  ➜  Network: http://${HOST}:${PORT}/`);
   });
 
   const handleShutdown = () => {

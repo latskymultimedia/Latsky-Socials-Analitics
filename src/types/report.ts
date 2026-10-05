@@ -389,6 +389,9 @@ export interface SocialReportData {
 
   // Uploaded raw screengrabs
   uploadedScreenshots: UploadedScreenshot[];
+
+  // Raw metrics appendix for audit logging & historical tracking
+  appendixRawMetrics?: Record<string, any>;
 }
 
 export interface ClassifiedUpload {
