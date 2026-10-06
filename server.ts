@@ -98,8 +98,32 @@ function reconcileAndHarmonizeReport(
         report[plat].reach = 0;
         report[plat].impressions = 0;
         report[plat].videoViews = 0;
+        report[plat].views = 0;
+        report[plat].watchTimeHours = 0;
         report[plat].engagementRate = 0;
         report[plat].topPosts = [];
+        report[plat].topVideos = [];
+        delete report[plat].growthPlaybook;
+        if (report[plat].postFormats) report[plat].postFormats = [];
+        if (report[plat].formatSplit) report[plat].formatSplit = [];
+        if (report[plat].trafficSources) report[plat].trafficSources = [];
+        if (report[plat].contentTypes) report[plat].contentTypes = [];
+        if (report[plat].videoMetrics) {
+          report[plat].videoMetrics = {
+            views: 0,
+            avgWatchTimeSec: 0,
+            retention3SecPercent: 0,
+            retention1MinPercent: 0,
+            commentary: 'Not monitored'
+          };
+        }
+        if (report[plat].demographics) {
+          report[plat].demographics = {
+            topLocations: [],
+            topAgeGender: 'N/A',
+            summary: 'Not monitored'
+          };
+        }
       }
       if (row) {
         row.followers = 0;
@@ -149,6 +173,19 @@ function reconcileAndHarmonizeReport(
     report.executiveSummary.overallEngagementRate = Number((weightedEngSum / totalCalculatedReach).toFixed(1));
   } else {
     report.executiveSummary.overallEngagementRate = 0.0;
+  }
+
+  // Filter cross-platform top posts and recommendations to only active platforms
+  if (report.contentPerformance?.topPostsAllPlatforms && Array.isArray(report.contentPerformance.topPostsAllPlatforms)) {
+    report.contentPerformance.topPostsAllPlatforms = report.contentPerformance.topPostsAllPlatforms.filter(
+      (p: any) => p && p.platform && isPlatformActive(p.platform)
+    );
+  }
+
+  if (report.recommendations?.actionableItems && Array.isArray(report.recommendations.actionableItems)) {
+    report.recommendations.actionableItems = report.recommendations.actionableItems.filter(
+      (item: any) => !item.platform || isPlatformActive(item.platform.toLowerCase())
+    );
   }
 
   return report;
