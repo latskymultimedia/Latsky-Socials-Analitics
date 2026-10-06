@@ -31,7 +31,7 @@ interface PlatformBreakdownSectionProps {
 
 const PlaybookView: React.FC<{
   platformLabel: string;
-  playbook?: PlatformGrowthPlaybook;
+  playbook?: PlatformGrowthPlaybook | null;
 }> = ({ platformLabel, playbook }) => {
   if (!playbook) return null;
   return (

@@ -89,8 +89,8 @@ function reconcileAndHarmonizeReport(
       if (report[plat]) report[plat].followers = Number(knownMetrics[`${plat}Followers`]) || 0;
     }
 
-    if (!active) {
-      // STRICTLY ZERO OUT UNMONITORED PLATFORMS
+    if (!active || (row && Number(row.followers || 0) === 0 && Number(row.reach || 0) === 0)) {
+      // STRICTLY ZERO OUT UNMONITORED OR ZERO-REACH PLATFORMS TO PREVENT TEMPLATE BLEED
       if (report[plat]) {
         report[plat].followers = 0;
         report[plat].subscribers = 0;
@@ -103,11 +103,11 @@ function reconcileAndHarmonizeReport(
         report[plat].engagementRate = 0;
         report[plat].topPosts = [];
         report[plat].topVideos = [];
-        delete report[plat].growthPlaybook;
-        if (report[plat].postFormats) report[plat].postFormats = [];
-        if (report[plat].formatSplit) report[plat].formatSplit = [];
-        if (report[plat].trafficSources) report[plat].trafficSources = [];
-        if (report[plat].contentTypes) report[plat].contentTypes = [];
+        report[plat].postFormats = [];
+        report[plat].formatSplit = [];
+        report[plat].trafficSources = [];
+        report[plat].contentTypes = [];
+        report[plat].growthPlaybook = null;
         if (report[plat].videoMetrics) {
           report[plat].videoMetrics = {
             views: 0,
@@ -125,7 +125,7 @@ function reconcileAndHarmonizeReport(
           };
         }
       }
-      if (row) {
+      if (row && !active) {
         row.followers = 0;
         row.followersDelta = 0;
         row.reach = 0;

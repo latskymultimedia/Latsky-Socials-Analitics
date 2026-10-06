@@ -137,7 +137,7 @@ export interface TikTokReport {
     topAgeGender: string;
     summary: string;
   };
-  growthPlaybook?: PlatformGrowthPlaybook;
+  growthPlaybook?: PlatformGrowthPlaybook | null;
 }
 
 export interface CrossPlatformTopPost {
@@ -294,7 +294,7 @@ export interface SocialReportData {
       topAgeGender: string;
       summary: string;
     };
-    growthPlaybook?: PlatformGrowthPlaybook;
+    growthPlaybook?: PlatformGrowthPlaybook | null;
   };
 
   instagram: {
@@ -309,7 +309,7 @@ export interface SocialReportData {
     storyCompletionRate: number;
     nonFollowerDiscoveryRate: number;
     topPosts: InstagramTopPost[];
-    growthPlaybook?: PlatformGrowthPlaybook;
+    growthPlaybook?: PlatformGrowthPlaybook | null;
   };
 
   youtube: {
@@ -325,7 +325,7 @@ export interface SocialReportData {
     trafficSources: YouTubeTrafficSource[];
     topVideos: YouTubeTopVideo[];
     retentionDropOffInsight: string;
-    growthPlaybook?: PlatformGrowthPlaybook;
+    growthPlaybook?: PlatformGrowthPlaybook | null;
   };
 
   linkedin: {
@@ -338,7 +338,7 @@ export interface SocialReportData {
     contentTypes: LinkedInContentType[];
     seniorityDemographics: { title: string; percentage: number }[];
     topPosts: LinkedInTopPost[];
-    growthPlaybook?: PlatformGrowthPlaybook;
+    growthPlaybook?: PlatformGrowthPlaybook | null;
   };
 
   tiktok?: TikTokReport;
