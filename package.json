@@ -35,3 +35,81 @@
     "@types/express": "^4.17.21"
   }
 }
+```[cite: 29]
+
+---
+
+### Step 2: Update `server_3.ts`
+To ensure that unmonitored platforms (like YouTube, LinkedIn, or TikTok when only Facebook/Instagram data is provided) strictly render `0` instead of fallback template numbers, update the default fallback values inside `reconcileAndHarmonizeReport` in **`server_3.ts`**.
+
+Replace the block inside **`server_3.ts`** around lines 91–110 where the fallback rows are created:
+
+```typescript
+  // Ensure each platform row exists
+  validPlatforms.forEach((plat) => {
+    let row = report.crossPlatformOverview.summaryTable.find(
+      (r: any) => r && r.platform && r.platform.toLowerCase() === plat
+    );
+    if (!row) {
+      row = {
+        platform: plat,
+        platformLabel: defaultLabels[plat],
+        followers: 0,
+        followersDelta: 0,
+        reach: 0,
+        reachDelta: 0,
+        engagementRate: 0,
+        topContentType: 'Not Monitored',
+        totalPosts: 0
+      };
+      report.crossPlatformOverview.summaryTable.push(row);
+    }
+  });
+
+  // Harmonize and zero out inactive platforms across all report objects
+  validPlatforms.forEach((plat) => {
+    const row = report.crossPlatformOverview.summaryTable.find((r: any) => r.platform?.toLowerCase() === plat);
+    const active = isPlatformActive(plat);
+
+    // Apply known user metrics if present and platform is active
+    if (active && knownMetrics[`${plat}Subscribers`] !== undefined && knownMetrics[`${plat}Subscribers`] !== '') {
+      if (report[plat]) report[plat].subscribers = Number(knownMetrics[`${plat}Subscribers`]) || 0;
+    }
+    if (active && knownMetrics[`${plat}Followers`] !== undefined && knownMetrics[`${plat}Followers`] !== '') {
+      if (report[plat]) report[plat].followers = Number(knownMetrics[`${plat}Followers`]) || 0;
+    }
+
+    if (!active || (row && Number(row.followers || 0) === 0 && Number(row.reach || 0) === 0 && !active)) {
+      // STRICTLY ZERO OUT UNMONITORED OR ZERO-REACH PLATFORMS TO PREVENT TEMPLATE BLEED
+      if (report[plat]) {
+        report[plat].followers = 0;
+        report[plat].subscribers = 0;
+        report[plat].netGrowth = 0;
+        report[plat].reach = 0;
+        report[plat].impressions = 0;
+        report[plat].videoViews = 0;
+        report[plat].views = 0;
+        report[plat].watchTimeHours = 0;
+        report[plat].engagementRate = 0;
+        report[plat].topPosts = [];
+        report[plat].topVideos = [];
+        report[plat].postFormats = [];
+        report[plat].formatSplit = [];
+        report[plat].trafficSources = [];
+        report[plat].contentTypes = [];
+        report[plat].growthPlaybook = null;
+      }
+      if (row && !active) {
+        row.followers = 0;
+        row.followersDelta = 0;
+        row.reach = 0;
+        row.reachDelta = 0;
+        row.engagementRate = 0;
+        row.totalPosts = 0;
+        row.topContentType = 'Not Monitored';
+      }
+    }
+  });
+```[cite: 30]
+
+Once you commit and push these updates to GitHub, Render will successfully install Vite and run your build without errors[cite: 25, 26, 29], clearing out all lingering mock data for unmonitored channels[cite: 30].
