@@ -174,13 +174,19 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
                       </div>
                     ) : (
                       <div className="flex items-baseline gap-1.5">
-                        <span className="font-bold text-stone-900">{row.followers.toLocaleString()}</span>
+                        <span className={`font-bold ${row.followers === 0 && row.reach === 0 ? 'text-stone-400' : 'text-stone-900'}`}>
+                          {row.followers.toLocaleString()}
+                        </span>
                         {row.followers >= 10000 && (
                           <span className="text-[10px] text-stone-400 font-mono">({formatNumber(row.followers)})</span>
                         )}
-                        <span className={`text-[11px] font-medium flex items-center ${row.followersDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                          {row.followersDelta >= 0 ? '+' : ''}{row.followersDelta.toLocaleString()}
-                        </span>
+                        {row.followers === 0 && row.followersDelta === 0 ? (
+                          <span className="text-[11px] text-stone-400 font-normal">—</span>
+                        ) : (
+                          <span className={`text-[11px] font-medium flex items-center ${row.followersDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {row.followersDelta >= 0 ? '+' : ''}{row.followersDelta.toLocaleString()}
+                          </span>
+                        )}
                       </div>
                     )}
                   </td>
@@ -196,10 +202,16 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
                       />
                     ) : (
                       <div>
-                        <span className="font-bold text-stone-900">{formatNumber(row.reach)}</span>
-                        <span className={`ml-2 text-[11px] font-medium ${row.reachDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                          {formatPercent(row.reachDelta, true)}
+                        <span className={`font-bold ${row.reach === 0 ? 'text-stone-400' : 'text-stone-900'}`}>
+                          {formatNumber(row.reach)}
                         </span>
+                        {row.reach === 0 && (row.reachDelta === 0 || !row.reachDelta) ? (
+                          <span className="ml-2 text-[11px] text-stone-400 font-normal">—</span>
+                        ) : (
+                          <span className={`ml-2 text-[11px] font-medium ${row.reachDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {formatPercent(row.reachDelta, true)}
+                          </span>
+                        )}
                       </div>
                     )}
                   </td>
@@ -216,7 +228,9 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
                       />
                     ) : (
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-stone-900">{row.engagementRate}%</span>
+                        <span className={`font-bold ${row.engagementRate === 0 && row.reach === 0 ? 'text-stone-400' : 'text-stone-900'}`}>
+                          {row.engagementRate}%
+                        </span>
                         <div className="w-16 bg-stone-100 rounded-full h-1.5 overflow-hidden">
                           <div
                             className="bg-stone-900 h-1.5 rounded-full"
@@ -237,7 +251,17 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
                         className="w-full px-1.5 py-1 text-xs border rounded"
                       />
                     ) : (
-                      <span>{row.topContentType}</span>
+                      row.topContentType === 'Not Monitored' ? (
+                        <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider text-stone-400 bg-stone-100 px-2 py-0.5 rounded">
+                          Not Monitored
+                        </span>
+                      ) : row.topContentType === 'Awaiting Data Export' || row.topContentType === 'Awaiting Upload' ? (
+                        <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          Awaiting Upload
+                        </span>
+                      ) : (
+                        <span>{row.topContentType}</span>
+                      )
                     )}
                   </td>
 

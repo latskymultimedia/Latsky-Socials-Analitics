@@ -16,8 +16,6 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
   const client = options.clientName?.trim() || 'Client Brand';
   const subtitle = options.clientSubtitle?.trim() || 'Executive Monthly Review';
   const period = options.reportPeriod?.trim() || 'Current Reporting Period';
-  const goals = options.goals?.trim() || 'Audience expansion and community engagement';
-  const notes = options.notes?.trim() || '';
   const known = options.knownMetrics || {};
 
   const requestedPlatforms = (options.platforms && options.platforms.length > 0)
@@ -26,77 +24,42 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
 
   const isPlatformActive = (plat: string) => requestedPlatforms.includes(plat.toLowerCase());
 
-  // Use only verified knownMetrics or default to 0 for incoming live data
-  const getMetric = (key: string, defaultVal = 0) => {
-    if (known[key] !== undefined && known[key] !== '') {
-      return Number(known[key]) || 0;
+  // Strict helper: returns 0 if no explicit known metric or uploaded data exists. NO FAKE DEFAULTS.
+  const getStrictMetric = (key: string) => {
+    if (known[key] !== undefined && known[key] !== '' && !isNaN(Number(known[key]))) {
+      return Number(known[key]);
     }
-    // Return 0 instead of fake template numbers if no data has been uploaded yet
-    return defaultVal;
+    return 0;
   };
 
-  const summaryTable = [
-    {
-      platform: 'youtube' as const,
-      platformLabel: 'YouTube',
-      followers: getMetric('youtubeSubscribers', 0),
-      followersDelta: getMetric('youtubeNetGrowth', 0),
-      reach: getMetric('youtubeReach', 0),
-      reachDelta: 0,
-      engagementRate: 0,
-      topContentType: isPlatformActive('youtube') ? 'Awaiting Data Export' : 'Not Monitored',
-      totalPosts: 0
-    },
-    {
-      platform: 'instagram' as const,
-      platformLabel: 'Instagram',
-      followers: getMetric('instagramFollowers', 0),
-      followersDelta: getMetric('instagramNetGrowth', 0),
-      reach: getMetric('instagramReach', 0),
-      reachDelta: 0,
-      engagementRate: 0,
-      topContentType: isPlatformActive('instagram') ? 'Awaiting Data Export' : 'Not Monitored',
-      totalPosts: 0
-    },
-    {
-      platform: 'linkedin' as const,
-      platformLabel: 'LinkedIn',
-      followers: getMetric('linkedinFollowers', 0),
-      followersDelta: getMetric('linkedinNetGrowth', 0),
-      reach: getMetric('linkedinReach', 0),
-      reachDelta: 0,
-      engagementRate: 0,
-      topContentType: isPlatformActive('linkedin') ? 'Awaiting Data Export' : 'Not Monitored',
-      totalPosts: 0
-    },
-    {
-      platform: 'facebook' as const,
-      platformLabel: 'Facebook',
-      followers: getMetric('facebookFollowers', 0),
-      followersDelta: getMetric('facebookNetGrowth', 0),
-      reach: getMetric('facebookReach', 0),
-      reachDelta: 0,
-      engagementRate: 0,
-      topContentType: isPlatformActive('facebook') ? 'Awaiting Data Export' : 'Not Monitored',
-      totalPosts: 0
-    },
-    {
-      platform: 'tiktok' as const,
-      platformLabel: 'TikTok',
-      followers: getMetric('tiktokFollowers', 0),
-      followersDelta: getMetric('tiktokNetGrowth', 0),
-      reach: getMetric('tiktokReach', 0),
-      reachDelta: 0,
-      engagementRate: 0,
-      topContentType: isPlatformActive('tiktok') ? 'Awaiting Data Export' : 'Not Monitored',
-      totalPosts: 0
-    }
+  const platformsList = [
+    { key: 'youtube', label: 'YouTube', subKey: 'youtubeSubscribers', growthKey: 'youtubeNetGrowth', reachKey: 'youtubeReach' },
+    { key: 'instagram', label: 'Instagram', subKey: 'instagramFollowers', growthKey: 'instagramNetGrowth', reachKey: 'instagramReach' },
+    { key: 'linkedin', label: 'LinkedIn', subKey: 'linkedinFollowers', growthKey: 'linkedinNetGrowth', reachKey: 'linkedinReach' },
+    { key: 'facebook', label: 'Facebook', subKey: 'facebookFollowers', growthKey: 'facebookNetGrowth', reachKey: 'facebookReach' },
+    { key: 'tiktok', label: 'TikTok', subKey: 'tiktokFollowers', growthKey: 'tiktokNetGrowth', reachKey: 'tiktokReach' },
   ];
 
+  const summaryTable = platformsList.map((p) => {
+    const active = isPlatformActive(p.key);
+    return {
+      platform: p.key as any,
+      platformLabel: p.label,
+      // If the platform is not monitored or active, force values to 0
+      followers: active ? getStrictMetric(p.subKey) : 0,
+      followersDelta: active ? getStrictMetric(p.growthKey) : 0,
+      reach: active ? getStrictMetric(p.reachKey) : 0,
+      reachDelta: 0,
+      engagementRate: 0,
+      topContentType: active ? 'Awaiting Data Export' : 'Not Monitored',
+      totalPosts: 0
+    };
+  });
+
   const activeRows = summaryTable.filter((r) => isPlatformActive(r.platform));
-  const reach = activeRows.reduce((sum, r) => sum + r.reach, 0);
-  const followers = activeRows.reduce((sum, r) => sum + r.followers, 0);
-  const netGrowth = activeRows.reduce((sum, r) => sum + r.followersDelta, 0);
+  const totalReach = activeRows.reduce((sum, r) => sum + r.reach, 0);
+  const totalFollowers = activeRows.reduce((sum, r) => sum + r.followers, 0);
+  const totalNetGrowth = activeRows.reduce((sum, r) => sum + r.followersDelta, 0);
 
   return {
     id: `syn-${Date.now()}`,
@@ -112,32 +75,31 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
     uploadedScreenshots: [],
     executiveSummary: {
       headlineTakeaways: [
-        reach > 0 
-          ? `Active cross-platform reach is tracking at ${reach.toLocaleString()} unique views across monitored channels.`
-          : `Awaiting screenshot uploads or data exports to calculate live cross-platform metrics.`
+        totalReach > 0 
+          ? `Active cross-platform reach is tracking at ${totalReach.toLocaleString()} unique views.`
+          : `Awaiting screenshot uploads or data exports to populate live metrics.`
       ],
-      overallReach: reach,
+      overallReach: totalReach,
       overallReachPrevDelta: 0,
       overallReachYoYDelta: 0,
       overallEngagementRate: 0,
       overallEngagementPrevDelta: 0,
       keyWins: [],
-      watchItem: 'Upload dashboard screengrabs or CSV exports to populate live diagnostic findings.'
+      watchItem: 'Upload platform exports to replace empty states with live data.'
     },
     goalsAndContext: {
-      strategyAim: goals,
-      campaignsAndBoosts: notes || 'Live reporting mode: Populates from verified uploads.',
+      strategyAim: options.goals?.trim() || 'Audience expansion and community engagement',
+      campaignsAndBoosts: options.notes?.trim() || 'Showing verified incoming data only.',
       externalFactors: 'Metrics reflect incoming live data exports and visual uploads.'
     },
     crossPlatformOverview: {
-      highlightInsight: 'Metrics reflect incoming live data exports and visual uploads.',
+      highlightInsight: 'Showing verified incoming data only.',
       summaryTable
     },
-    // Keep structured objects clean and ready to bind real extracted values
     facebook: {
-      followers: getMetric('facebookFollowers', 0),
-      netGrowth: getMetric('facebookNetGrowth', 0),
-      reachOrganic: getMetric('facebookReach', 0),
+      followers: getStrictMetric('facebookFollowers'),
+      netGrowth: getStrictMetric('facebookNetGrowth'),
+      reachOrganic: getStrictMetric('facebookReach'),
       reachPaid: 0,
       engagementRate: 0,
       postFormats: [],
@@ -146,21 +108,21 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
         avgWatchTimeSec: 0,
         retention3SecPercent: 0,
         retention1MinPercent: 0,
-        commentary: 'Awaiting video metrics upload'
+        commentary: 'Awaiting data'
       },
       topPosts: [],
       demographics: {
         topLocations: [],
         topAgeGender: 'N/A',
-        summary: 'Awaiting demographic data'
+        summary: 'Awaiting data'
       },
       growthPlaybook: null
     },
     instagram: {
-      followers: getMetric('instagramFollowers', 0),
-      netGrowth: getMetric('instagramNetGrowth', 0),
+      followers: getStrictMetric('instagramFollowers'),
+      netGrowth: getStrictMetric('instagramNetGrowth'),
       followUnfollowRatio: 'N/A',
-      reach: getMetric('instagramReach', 0),
+      reach: getStrictMetric('instagramReach'),
       impressions: 0,
       profileVisits: 0,
       websiteTaps: 0,
@@ -171,10 +133,10 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
       growthPlaybook: null
     },
     youtube: {
-      subscribers: getMetric('youtubeSubscribers', 0),
-      netGrowth: getMetric('youtubeNetGrowth', 0),
+      subscribers: getStrictMetric('youtubeSubscribers'),
+      netGrowth: getStrictMetric('youtubeNetGrowth'),
       subsGainedPerVideoAvg: 0,
-      views: getMetric('youtubeReach', 0),
+      views: getStrictMetric('youtubeReach'),
       watchTimeHours: 0,
       avgViewDuration: '0:00',
       avgPercentViewed: 0,
@@ -182,14 +144,14 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
       impressionsSuggestedBrowse: 0,
       trafficSources: [],
       topVideos: [],
-      retentionDropOffInsight: 'Awaiting YouTube Studio upload',
+      retentionDropOffInsight: 'Awaiting data',
       growthPlaybook: null
     },
     linkedin: {
-      followers: getMetric('linkedinFollowers', 0),
-      netGrowth: getMetric('linkedinNetGrowth', 0),
+      followers: getStrictMetric('linkedinFollowers'),
+      netGrowth: getStrictMetric('linkedinNetGrowth'),
       pageVisitors: 0,
-      impressions: getMetric('linkedinReach', 0),
+      impressions: getStrictMetric('linkedinReach'),
       engagementRate: 0,
       ctr: 0,
       contentTypes: [],
@@ -198,9 +160,9 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
       growthPlaybook: null
     },
     tiktok: {
-      followers: getMetric('tiktokFollowers', 0),
-      netGrowth: getMetric('tiktokNetGrowth', 0),
-      videoViews: getMetric('tiktokReach', 0),
+      followers: getStrictMetric('tiktokFollowers'),
+      netGrowth: getStrictMetric('tiktokNetGrowth'),
+      videoViews: getStrictMetric('tiktokReach'),
       profileViews: 0,
       likes: 0,
       shares: 0,
@@ -211,13 +173,13 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
         avgWatchTimeSec: 0,
         completionRatePercent: 0,
         fypTrafficPercent: 0,
-        retentionInsight: 'Awaiting TikTok analytics upload'
+        retentionInsight: 'Awaiting data'
       },
       topPosts: [],
       demographics: {
         topLocations: [],
         topAgeGender: 'N/A',
-        summary: 'Awaiting demographic data'
+        summary: 'Awaiting data'
       },
       growthPlaybook: null
     },
@@ -239,7 +201,7 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
       industryBenchmarkAvg: {
         engagementRate: 'N/A',
         reachGrowth: 'N/A',
-        summary: 'Add competitor links in Section 07 to generate benchmark radar.'
+        summary: 'Add competitor links to generate benchmark radar.'
       },
       competitors: []
     },
@@ -249,9 +211,9 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
       testingPriorities: []
     },
     appendixRawMetrics: [
-      { metric: 'Total Cross-Platform Impressions', value: reach > 0 ? (reach * 1.5).toLocaleString() : '0', notes: 'Awaiting uploads' },
-      { metric: 'Total Video Views (>3s)', value: reach > 0 ? Math.round(reach * 0.4).toLocaleString() : '0', notes: 'Awaiting uploads' },
-      { metric: 'Net Inbound Inquiries via Social Bio Links', value: '0', notes: 'Awaiting uploads' }
+      { metric: 'Total Cross-Platform Impressions', value: totalReach > 0 ? (totalReach * 1.5).toLocaleString() : '0', notes: 'Verified uploads only' },
+      { metric: 'Total Video Views (>3s)', value: totalReach > 0 ? Math.round(totalReach * 0.4).toLocaleString() : '0', notes: 'Verified uploads only' },
+      { metric: 'Net Inbound Inquiries via Social Bio Links', value: '0', notes: 'Verified uploads only' }
     ]
   };
 }

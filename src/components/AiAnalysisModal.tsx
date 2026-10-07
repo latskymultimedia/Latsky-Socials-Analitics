@@ -1113,7 +1113,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">Current Subscribers</label>
                       <input
                         type="number"
-                        placeholder="e.g. 18400"
+                        placeholder="Verified count (e.g. 0)"
                         value={knownMetrics.youtubeSubscribers}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, youtubeSubscribers: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-red-400"
@@ -1123,7 +1123,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">28-Day Net Growth (+/-)</label>
                       <input
                         type="number"
-                        placeholder="e.g. 940"
+                        placeholder="Net change (e.g. 0)"
                         value={knownMetrics.youtubeNetGrowth}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, youtubeNetGrowth: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-red-400"
@@ -1141,7 +1141,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">Total Followers</label>
                       <input
                         type="number"
-                        placeholder="e.g. 12400"
+                        placeholder="Verified count (e.g. 0)"
                         value={knownMetrics.tiktokFollowers}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, tiktokFollowers: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-stone-400"
@@ -1151,7 +1151,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">Net Followers Gained</label>
                       <input
                         type="number"
-                        placeholder="e.g. 1850"
+                        placeholder="Net change (e.g. 0)"
                         value={knownMetrics.tiktokNetGrowth}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, tiktokNetGrowth: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-stone-400"
@@ -1169,7 +1169,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">Total Followers</label>
                       <input
                         type="number"
-                        placeholder="e.g. 16800"
+                        placeholder="Verified count (e.g. 0)"
                         value={knownMetrics.instagramFollowers}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, instagramFollowers: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-rose-400"
@@ -1179,7 +1179,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">Net Growth (+/-)</label>
                       <input
                         type="number"
-                        placeholder="e.g. 820"
+                        placeholder="Net change (e.g. 0)"
                         value={knownMetrics.instagramNetGrowth}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, instagramNetGrowth: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-rose-400"
@@ -1197,7 +1197,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">Total Followers</label>
                       <input
                         type="number"
-                        placeholder="e.g. 7800"
+                        placeholder="Verified count (e.g. 0)"
                         value={knownMetrics.linkedinFollowers}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, linkedinFollowers: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-sky-400"
@@ -1207,7 +1207,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">New Followers</label>
                       <input
                         type="number"
-                        placeholder="e.g. 410"
+                        placeholder="Net change (e.g. 0)"
                         value={knownMetrics.linkedinNetGrowth}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, linkedinNetGrowth: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-sky-400"
@@ -1225,7 +1225,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">Page Followers</label>
                       <input
                         type="number"
-                        placeholder="e.g. 5200"
+                        placeholder="Verified count (e.g. 0)"
                         value={knownMetrics.facebookFollowers}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, facebookFollowers: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-blue-400"
@@ -1235,7 +1235,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
                       <label className="text-[10px] text-stone-500 font-medium">Net Followers (+/-)</label>
                       <input
                         type="number"
-                        placeholder="e.g. 120"
+                        placeholder="Net change (e.g. 0)"
                         value={knownMetrics.facebookNetGrowth}
                         onChange={(e) => setKnownMetrics({ ...knownMetrics, facebookNetGrowth: e.target.value })}
                         className="w-full px-2 py-1 bg-white border border-stone-200 rounded text-xs focus:ring-1 focus:ring-blue-400"

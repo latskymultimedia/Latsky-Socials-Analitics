@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { verandertReport, artisanRetreatReport } from './data/mockReports';
+import { initialReportState, verandertReport, artisanRetreatReport } from './data/mockReports';
 import { 
   PlatformType, 
   SocialReportData, 
@@ -40,7 +40,7 @@ import { CheckCircle2, AlertCircle, X, Layers, Sparkles, Globe, Users, Eye, Shar
 export default function App() {
   const [report, setReport] = useState<SocialReportData>(() => {
     const saved = loadCurrentReportFromStorage();
-    return saved || verandertReport;
+    return saved || initialReportState;
   });
 
   const [activeReportView, setActiveReportView] = useState<'overall' | PlatformType>('overall');

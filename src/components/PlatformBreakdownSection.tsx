@@ -211,95 +211,32 @@ export const PlatformBreakdownSection: React.FC<PlatformBreakdownSectionProps> =
 
   const { facebook, instagram, youtube, linkedin, tiktok } = report;
 
-  const effectiveTiktok = tiktok || {
-    followers: 18900,
-    netGrowth: 3100,
-    videoViews: 142000,
-    profileViews: 12400,
-    likes: 21800,
-    shares: 5400,
-    comments: 1820,
-    engagementRate: 7.4,
-    postFormats: [
-      { format: 'Sensory Micro-Hooks (<15s)', count: 5, avgViews: 38400, avgEngagement: 9.6 },
-      { format: 'Narrative Craft Masterclasses (60s)', count: 3, avgViews: 24100, avgEngagement: 7.8 },
-      { format: 'Behind-the-Scenes & Sound Wipes', count: 2, avgViews: 18900, avgEngagement: 6.2 }
-    ],
+  const defaultEmptyTiktok = {
+    followers: 0,
+    netGrowth: 0,
+    videoViews: 0,
+    profileViews: 0,
+    likes: 0,
+    shares: 0,
+    comments: 0,
+    engagementRate: 0,
+    postFormats: [],
     videoMetrics: {
-      avgWatchTimeSec: 21.4,
-      completionRatePercent: 49.2,
-      fypTrafficPercent: 88.5,
-      retentionInsight: 'Acoustic pattern interrupts in first 1.5 seconds drove 2.4 average replays per viewer. FYP distribution waves triggered by high completion rates.'
+      avgWatchTimeSec: 0,
+      completionRatePercent: 0,
+      fypTrafficPercent: 0,
+      retentionInsight: 'Awaiting TikTok dashboard screengrabs or exports to analyze retention.'
     },
-    topPosts: [
-      {
-        id: 'tt-eff-1',
-        title: 'Sensory Foley Sound & Cinematic Tone Breakdown',
-        views: 89400,
-        likes: 14800,
-        shares: 3800,
-        comments: 940,
-        engagementRate: 11.4,
-        whyItWorked: 'High sensory audio loop; viewers looped repeatedly and bookmarked for creative reference.'
-      },
-      {
-        id: 'tt-eff-2',
-        title: 'Why Most Visual Projects Fail the FYP Algorithm',
-        views: 52600,
-        likes: 7000,
-        shares: 1600,
-        comments: 880,
-        engagementRate: 8.2,
-        whyItWorked: 'Contrarian industry thesis sparked active debate in comments.'
-      }
-    ],
+    topPosts: [],
     demographics: {
-      topLocations: ['United States (42%)', 'United Kingdom (28%)', 'Canada (16%)'],
-      topAgeGender: '58% Female / 42% Male · Peak 20–38 years old',
-      summary: 'High engagement creator and professional demographic with strong save velocity.'
+      topLocations: [],
+      topAgeGender: 'N/A',
+      summary: 'Awaiting demographic analytics upload'
     },
-    growthPlaybook: {
-      subsStrategy: {
-        conversionHook: 'Follow for weekly creative masterclasses, lighting setups, and sound design stems.',
-        profileBioTweak: 'Director & Creative Studio | Commercial Film Teardowns | New breakdowns in bio ↘',
-        leadMagnetOrSeries: 'Launch "60-Second Film School": Weekly 3-part micro-lessons ending with an open question.',
-        keyAction: 'Pin 3 signature masterclasses to top of profile that showcase the studio high-end reel.'
-      },
-      viewsStrategy: {
-        viralHookTemplate: 'Immediate high-contrast visual pattern interrupt in frame 1 without voiceover interruptions.',
-        retentionTrigger: 'Visual countdown of key details with continuous ambient audio bed to eliminate drop-off.',
-        algorithmDistributionHack: '12-second seamless audio loops that loop imperceptibly on TikTok FYP.',
-        keyAction: 'Test 3 seamless sound design loops this month to maximize loop multiplier metric on FYP.'
-      },
-      commentsStrategy: {
-        discussionPrompt: 'Which creative choice fits this scene better? Tell us why in the comments.',
-        pinnedCommentPlay: 'Pin a technical question highlighting a subtle flaw or choice in the craft to provoke comments.',
-        engagementVelocityTactic: 'Reply to the first 25 comments within 45 minutes of publishing using video replies when possible.',
-        keyAction: 'Create one dedicated video-reply answering a technical question from last week top comment.'
-      },
-      algorithmUpdatesNews: {
-        latestUpdate: 'TikTok 2026 algorithm rewards search-optimized video SEO descriptions and long-tail query matches over generic trending hashtags.',
-        impactOnBrand: 'Keyword-rich spoken audio and on-screen text now drive 35% of post discoverability through TikTok Search.',
-        tacticalPivot: 'Include precise search keywords in spoken voiceover, text overlays, and the first 2 lines of caption.'
-      },
-      suggestions: [
-        {
-          id: 'tt-s1',
-          field: 'subs',
-          label: 'Series Playlist Architecture',
-          tactic: 'Group micro-breakdowns into a TikTok Creator Playlist.',
-          expectedImpact: '+55% viewer-to-follower conversion rate'
-        },
-        {
-          id: 'tt-s2',
-          field: 'views',
-          label: 'Seamless Audio Loop Craft',
-          tactic: 'Compose audio beds where the final snare hit resolves on the first frame of the repeat loop.',
-          expectedImpact: 'Average watch time increases from 17s to 23s'
-        }
-      ]
-    }
+    growthPlaybook: null
   };
+
+  const effectiveTiktok = tiktok || defaultEmptyTiktok;
 
   return (
     <section className="bg-white rounded-xl border border-stone-200 shadow-xs p-6 sm:p-8 space-y-6">

@@ -1,6 +1,34 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script type="text/javascript">
+      // Suppress harmless WebSocket and HMR connection errors in preview iframe
+      window.addEventListener('error', function(event) {
+        if (
+          (event.message && (
+            event.message.includes('WebSocket') ||
+            event.message.includes('createWebSocketModuleRunnerTransport') ||
+            event.message.includes('@vite/client')
+          )) ||
+          (event.filename && event.filename.includes('@vite/client'))
+        ) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+          return true;
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function(event) {
+        var reason = String(event.reason || '');
+        if (
+          reason.includes('WebSocket') ||
+          reason.includes('createWebSocketModuleRunnerTransport') ||
+          reason.includes('@vite/client')
+        ) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+        }
+      }, true);
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Latsky Socials - In-Depth Client Reporting & Dashboard Intelligence</title>

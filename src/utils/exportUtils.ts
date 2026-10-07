@@ -32,36 +32,22 @@ export function generateStandaloneHtmlReport(
     : null;
 
   const effectiveTiktok = report.tiktok || {
-    followers: 18900,
-    netGrowth: 3100,
-    videoViews: 142000,
-    profileViews: 12400,
-    likes: 21800,
-    shares: 5400,
-    comments: 1820,
-    engagementRate: 7.4,
-    postFormats: [
-      { format: 'Sensory Clips & Hooks (<15s)', count: 5, avgViews: 38400, avgEngagement: 9.6 },
-      { format: 'Narrative Storytelling (60s)', count: 3, avgViews: 24100, avgEngagement: 7.8 }
-    ],
+    followers: 0,
+    netGrowth: 0,
+    videoViews: 0,
+    profileViews: 0,
+    likes: 0,
+    shares: 0,
+    comments: 0,
+    engagementRate: 0,
+    postFormats: [],
     videoMetrics: {
-      avgWatchTimeSec: 21.4,
-      completionRatePercent: 49.2,
-      fypTrafficPercent: 88.5,
-      retentionInsight: 'Acoustic pattern interrupts in first 1.5s drove 2.4 replays per viewer.'
+      avgWatchTimeSec: 0,
+      completionRatePercent: 0,
+      fypTrafficPercent: 0,
+      retentionInsight: 'Awaiting TikTok analytics data.'
     },
-    topPosts: [
-      {
-        id: 'tt-export-def',
-        title: 'Sensory Sound Design & Visual Atmosphere',
-        views: 89400,
-        likes: 14800,
-        shares: 3800,
-        comments: 940,
-        engagementRate: 11.4,
-        whyItWorked: 'High sensory retention trigger; viewers looped audio multiple times.'
-      }
-    ]
+    topPosts: []
   };
 
   // Common CSS styling
