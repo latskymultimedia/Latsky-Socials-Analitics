@@ -279,12 +279,12 @@ export default function App() {
       setSelectedSummaryPlatforms(active);
     }
 
-    setReport((prev) => ({
-      ...prev,
-      ...newReportData,
-      uploadedScreenshots: newScreenshots && newScreenshots.length > 0 ? newScreenshots : (prev.uploadedScreenshots || []),
+    // Directly set the live report state to clear out any old template defaults
+    setReport({
+      ...(newReportData as SocialReportData),
+      uploadedScreenshots: newScreenshots && newScreenshots.length > 0 ? newScreenshots : [],
       lastModified: new Date().toISOString(),
-    }));
+    });
     showToast(`AI analysis complete! Report synthesized for ${newReportData.clientName || report.clientName}.`);
   };
 
