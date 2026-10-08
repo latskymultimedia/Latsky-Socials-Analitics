@@ -25,6 +25,6 @@
     "noEmit": true
   }
 }
-```[cite: 19]
+``[cite: 19]
 
 Make sure **line 26 `}` is the very last line in the file**, commit the change, and both your builds will pass cleanly!
