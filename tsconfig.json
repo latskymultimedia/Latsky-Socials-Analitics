@@ -27,4 +27,4 @@
 }
 ```[cite: 19]
 
-4. Save the file, commit, and push to GitHub. Both Vercel and Render will build successfully!
+Make sure **line 26 `}` is the very last line in the file**, commit the change, and both your builds will pass cleanly!
