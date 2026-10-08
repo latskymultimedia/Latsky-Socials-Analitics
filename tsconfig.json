@@ -27,4 +27,4 @@
 }
 ```[cite: 19]
 
-Save the file, push to GitHub, and trigger **Clear build cache & deploy** on Render.
+Save the file, push the update to GitHub, and trigger a fresh deployment on Render with **Clear build cache & deploy**.
