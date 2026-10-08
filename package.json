@@ -35,6 +35,3 @@
     "@types/express": "^4.17.21"
   }
 }
-```[cite: 28]
-
-Save the file, push it to GitHub, and both Render and Vercel will pass their builds cleanly.
