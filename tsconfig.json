@@ -27,7 +27,4 @@
 }
 ```[cite: 19]
 
-3. Save the file, commit, and push to GitHub. 
-4. Head back to Render, click **Manual Deploy > Clear build cache & deploy**. 
-
-Once deployed, the TypeScript compiler will parse `tsconfig.json` successfully, Vite will build without errors, and your clean, template-free app will go live.
+Save the file, push to GitHub, and trigger **Clear build cache & deploy** on Render.
