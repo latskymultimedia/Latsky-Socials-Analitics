@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { generateSynthesizedAgencyReport } from './serverReportSynthesizer.js';
-import { parseMetaCsvExports, applyMetaCsvToReport } from './src/utils/metaCsvParser.js';
+import { parseMetaCsvExports, applyMetaCsvToReport, parseMetric } from './src/utils/metaCsvParser.js';
 
 dotenv.config();
 
@@ -37,7 +37,8 @@ function reconcileAndHarmonizeReport(
   if (!report) return report;
 
   const validPlatforms = ['youtube', 'instagram', 'linkedin', 'facebook', 'tiktok'];
-  const targets = (requestedPlatforms && requestedPlatforms.length > 0)
+  // Empty platforms array should NOT default to all platforms; empty means no active platforms requested
+  const targets = Array.isArray(requestedPlatforms)
     ? requestedPlatforms.map((p) => p.toLowerCase())
     : validPlatforms;
 
@@ -77,26 +78,63 @@ function reconcileAndHarmonizeReport(
     }
   });
 
-  // Harmonize and zero out inactive platforms across all report objects
+  // STEP 1: SYNC PRIOR TO ZERO-OUT & APPLY KNOWN METRICS PRECEDENCE
+  validPlatforms.forEach((plat) => {
+    const row = report.crossPlatformOverview.summaryTable.find((r: any) => r.platform?.toLowerCase() === plat);
+    if (!row) return;
+
+    if (report[plat]) {
+      const subsOrFollowers = parseMetric(report[plat].subscribers || report[plat].followers || row.followers);
+      const netDelta = parseMetric(report[plat].netGrowth || row.followersDelta);
+      const reachVal = parseMetric(report[plat].reach || report[plat].impressions || report[plat].videoViews || row.reach);
+      const engVal = parseMetric(report[plat].engagementRate || row.engagementRate);
+
+      report[plat].followers = subsOrFollowers;
+      if (report[plat].subscribers !== undefined) report[plat].subscribers = subsOrFollowers;
+      report[plat].netGrowth = netDelta;
+
+      row.followers = subsOrFollowers;
+      row.followersDelta = netDelta;
+      row.reach = reachVal;
+      row.engagementRate = engVal;
+    }
+
+    // Apply known user metrics with strict top precedence
+    if (knownMetrics[`${plat}Subscribers`] !== undefined && knownMetrics[`${plat}Subscribers`] !== '') {
+      const kmSubs = parseMetric(knownMetrics[`${plat}Subscribers`]);
+      if (report[plat]) report[plat].subscribers = kmSubs;
+      row.followers = kmSubs;
+    }
+    if (knownMetrics[`${plat}Followers`] !== undefined && knownMetrics[`${plat}Followers`] !== '') {
+      const kmFollowers = parseMetric(knownMetrics[`${plat}Followers`]);
+      if (report[plat]) report[plat].followers = kmFollowers;
+      row.followers = kmFollowers;
+    }
+    if (knownMetrics[`${plat}NetGrowth`] !== undefined && knownMetrics[`${plat}NetGrowth`] !== '') {
+      const kmNet = parseMetric(knownMetrics[`${plat}NetGrowth`]);
+      if (report[plat]) report[plat].netGrowth = kmNet;
+      row.followersDelta = kmNet;
+    }
+    if (knownMetrics[`${plat}Reach`] !== undefined && knownMetrics[`${plat}Reach`] !== '') {
+      const kmReach = parseMetric(knownMetrics[`${plat}Reach`]);
+      if (report[plat]) report[plat].reach = kmReach;
+      row.reach = kmReach;
+    }
+  });
+
+  // STEP 2: RECURSIVE ZERO-OUT OF INACTIVE PLATFORMS (INCLUDING reachOrganic, reachPaid & stale deltas)
   validPlatforms.forEach((plat) => {
     const row = report.crossPlatformOverview.summaryTable.find((r: any) => r.platform?.toLowerCase() === plat);
     const active = isPlatformActive(plat);
 
-    // Apply known user metrics if present
-    if (knownMetrics[`${plat}Subscribers`] !== undefined && knownMetrics[`${plat}Subscribers`] !== '') {
-      if (report[plat]) report[plat].subscribers = Number(knownMetrics[`${plat}Subscribers`]) || 0;
-    }
-    if (knownMetrics[`${plat}Followers`] !== undefined && knownMetrics[`${plat}Followers`] !== '') {
-      if (report[plat]) report[plat].followers = Number(knownMetrics[`${plat}Followers`]) || 0;
-    }
-
-    if (!active || (row && Number(row.followers || 0) === 0 && Number(row.reach || 0) === 0)) {
-      // STRICTLY ZERO OUT UNMONITORED OR ZERO-REACH PLATFORMS TO PREVENT TEMPLATE BLEED
+    if (!active) {
       if (report[plat]) {
         report[plat].followers = 0;
         report[plat].subscribers = 0;
         report[plat].netGrowth = 0;
         report[plat].reach = 0;
+        report[plat].reachOrganic = 0;
+        report[plat].reachPaid = 0;
         report[plat].impressions = 0;
         report[plat].videoViews = 0;
         report[plat].views = 0;
@@ -115,42 +153,36 @@ function reconcileAndHarmonizeReport(
             avgWatchTimeSec: 0,
             retention3SecPercent: 0,
             retention1MinPercent: 0,
-            commentary: 'Active cross-syndication opportunity from top Facebook/Instagram assets.'
+            commentary: 'Active cross-syndication opportunity.'
           };
         }
         if (report[plat].demographics) {
           report[plat].demographics = {
             topLocations: [],
             topAgeGender: 'Omni-Channel Baseline',
-            summary: 'Active Syndication Pipeline: Short-form cuts ready for cross-channel distribution.'
+            summary: 'Cross-syndication pipeline.'
           };
         }
       }
-      if (row && !active) {
+      if (row) {
         row.followers = 0;
         row.followersDelta = 0;
         row.reach = 0;
         row.reachDelta = 0;
         row.engagementRate = 0;
         row.totalPosts = 0;
-        row.topContentType = 'Cross-Syndication Ready';
+        row.topContentType = 'Not Monitored';
       }
-    } else {
-      // Sync row values with platform object values
+    } else if (row && row.followers === 0 && row.reach === 0) {
+      // Clear stale delta fields if no followers or reach present
+      row.followersDelta = 0;
+      row.reachDelta = 0;
+      row.engagementRate = 0;
       if (report[plat]) {
-        const subsOrFollowers = Number(report[plat].subscribers || report[plat].followers || row.followers || 0);
-        const netDelta = Number(report[plat].netGrowth || row.followersDelta || 0);
-        const reachVal = Number(report[plat].reach || report[plat].impressions || report[plat].videoViews || row.reach || 0);
-        const engVal = Number(report[plat].engagementRate || row.engagementRate || 0);
-
-        report[plat].followers = subsOrFollowers;
-        if (report[plat].subscribers !== undefined) report[plat].subscribers = subsOrFollowers;
-        report[plat].netGrowth = netDelta;
-
-        row.followers = subsOrFollowers;
-        row.followersDelta = netDelta;
-        row.reach = reachVal;
-        row.engagementRate = engVal;
+        report[plat].netGrowth = 0;
+        report[plat].reachOrganic = 0;
+        report[plat].reachPaid = 0;
+        report[plat].engagementRate = 0;
       }
     }
   });
@@ -159,14 +191,14 @@ function reconcileAndHarmonizeReport(
   if (!report.executiveSummary) report.executiveSummary = {};
   
   const activeRows = report.crossPlatformOverview.summaryTable.filter(
-    (r: any) => isPlatformActive(r.platform) && ((Number(r.followers) || 0) > 0 || (Number(r.reach) || 0) > 0)
+    (r: any) => isPlatformActive(r.platform) && (parseMetric(r.followers) > 0 || parseMetric(r.reach) > 0)
   );
 
-  const totalCalculatedReach = activeRows.reduce((sum: number, r: any) => sum + (Number(r.reach) || 0), 0);
+  const totalCalculatedReach = activeRows.reduce((sum: number, r: any) => sum + parseMetric(r.reach), 0);
   report.executiveSummary.overallReach = totalCalculatedReach;
 
   const weightedEngSum = activeRows.reduce(
-    (sum: number, r: any) => sum + ((Number(r.reach) || 0) * (Number(r.engagementRate) || 0)),
+    (sum: number, r: any) => sum + (parseMetric(r.reach) * parseMetric(r.engagementRate)),
     0
   );
 
@@ -445,7 +477,7 @@ Output strictly valid JSON with no markdown wrapping.`;
       return res.json({
         success: true,
         report: finalReport,
-        isAiGenerated: Boolean(responseText),
+        isAiGenerated: Boolean(parsedData),
         csvFilesParsed: csvMetrics.filesProcessed
       });
     } catch (err: any) {
@@ -715,7 +747,7 @@ Produce strictly valid JSON with this exact schema:
     "industryName": "${industry}",
     "scrapedAt": "${new Date().toISOString()}",
     "source": "${sourceOrigin}",
-    "sourcesScraped": ${JSON.stringify(sourcesScraped.length > 0 ? sourcesScraped : ['https://creatorhandbook.io/algorithm-updates-2026', 'https://trends.google.com/social-benchmarks', 'https://algorithm-insights.agency/industry-playbooks'])},
+    "sourcesScraped": ${JSON.stringify(sourcesScraped)},
     "industryOverview": "Executive summary of the state of social media in this sector right now.",
     "subGrowthPlaybook": "Tactical playbook for converting casual viewers into subscribers/followers in this vertical.",
     "viewsAndReachPlaybook": "Tactical playbook for engineering massive reach and algorithm pickups in this vertical.",

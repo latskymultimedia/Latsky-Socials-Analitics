@@ -2,7 +2,7 @@ import { FileUploadType, PlatformType, UploadedScreenshot } from '../types/repor
 import { fileToBase64 } from './formatters';
 
 // Helper to compress and downscale images before sending to AI analysis
-export function compressImage(file: File, maxWidth = 1200, quality = 0.8): Promise<string> {
+export function compressImage(file: File, maxWidth = 2200, quality = 0.95): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);

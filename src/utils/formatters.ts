@@ -1,3 +1,13 @@
+export function escapeHtml(str: string | undefined | null): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function formatNumber(num: number | undefined | null): string {
   if (num === undefined || num === null || isNaN(num)) return '0';
   if (Math.abs(num) >= 1_000_000) {

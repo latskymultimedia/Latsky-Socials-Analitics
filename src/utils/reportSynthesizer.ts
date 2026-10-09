@@ -1,4 +1,5 @@
 import { SocialReportData } from '../types/report';
+import { parseMetric } from './metaCsvParser';
 
 export interface SynthesisOptions {
   clientName: string;
@@ -26,8 +27,8 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
 
   // Strict helper: returns 0 if no explicit known metric or uploaded data exists. NO FAKE DEFAULTS.
   const getStrictMetric = (key: string) => {
-    if (known[key] !== undefined && known[key] !== '' && !isNaN(Number(known[key]))) {
-      return Number(known[key]);
+    if (known[key] !== undefined && known[key] !== '') {
+      return parseMetric(known[key]);
     }
     return 0;
   };
@@ -194,7 +195,7 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
     },
     audienceInsights: {
       growthQuality: 'Upload audience screenshots or CSV exports to analyze organic acquisition.',
-      organicVsPaidRatio: '89.2% Organic / 10.8% Paid Baseline',
+      organicVsPaidRatio: 'Not provided',
       demographicShifts: 'Audience concentrated in high-affinity metropolitan hubs.'
     },
     competitiveBenchmark: {
@@ -211,8 +212,8 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
       testingPriorities: []
     },
     appendixRawMetrics: [
-      { metric: 'Total Cross-Platform Impressions', value: totalReach > 0 ? (totalReach * 1.5).toLocaleString() : '0', notes: 'Verified uploads only' },
-      { metric: 'Total Video Views (>3s)', value: totalReach > 0 ? Math.round(totalReach * 0.4).toLocaleString() : '0', notes: 'Verified uploads only' },
+      { metric: 'Total Cross-Platform Impressions', value: totalReach > 0 ? totalReach.toLocaleString() : '0', notes: 'Verified uploads only' },
+      { metric: 'Total Video Views (>3s)', value: '0', notes: 'Verified uploads only' },
       { metric: 'Net Inbound Inquiries via Social Bio Links', value: '0', notes: 'Verified uploads only' }
     ]
   };

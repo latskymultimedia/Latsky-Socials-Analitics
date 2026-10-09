@@ -22,9 +22,12 @@ export function saveReportToHistory(report: any) {
   }
 }
 
-export function calculateMoMDelta(currentReach: number) {
+export function calculateMoMDelta(currentReach: number, clientName?: string) {
   try {
-    const history = JSON.parse(localStorage.getItem('latsky_audit_history') || '[]');
+    const rawHistory = JSON.parse(localStorage.getItem('latsky_audit_history') || '[]');
+    const history = clientName 
+      ? rawHistory.filter((entry: any) => entry.clientName?.toLowerCase().trim() === clientName.toLowerCase().trim())
+      : rawHistory;
     if (history.length < 2) return { deltaPercent: 0, hasHistory: false };
     
     const previousReach = history[1].reach || currentReach;

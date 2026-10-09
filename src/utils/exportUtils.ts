@@ -1,5 +1,7 @@
 import { SocialReportData, PlatformType, ActionRecommendation, TacticalSuggestion } from '../types/report';
-import { formatNumber, formatPercent } from './formatters';
+import { formatNumber, formatPercent, escapeHtml } from './formatters';
+
+export { escapeHtml };
 
 /**
  * Generates a clean, standalone, printable agency HTML report for the client.
@@ -14,9 +16,10 @@ export function generateStandaloneHtmlReport(
   const isPlatformSpecific = Boolean(platformFilter && platformFilter !== 'overall');
   const targetPlatform: PlatformType = isPlatformSpecific ? (platformFilter as PlatformType) : 'general';
 
+  const clientEscaped = escapeHtml(report.clientName);
   const title = isPlatformSpecific
-    ? `${report.clientName} - ${targetPlatform.toUpperCase()} Performance & Growth Blueprint`
-    : `${report.clientName} - Monthly Social Performance Intelligence Report`;
+    ? `${clientEscaped} - ${targetPlatform.toUpperCase()} Performance & Growth Blueprint`
+    : `${clientEscaped} - Monthly Social Performance Intelligence Report`;
 
   const rows = report.crossPlatformOverview?.summaryTable || [];
   const recs = report.recommendations?.actionableItems || [];

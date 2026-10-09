@@ -45,7 +45,7 @@ interface HeaderProps {
   onOpenExportModal: () => void;
   onSaveToLaptop: () => void;
   onLoadFromLaptop: (file: File) => void;
-  onLoadPreset: (presetKey: 'verandert' | 'retreat' | 'intelligence') => void;
+  onLoadPreset: (presetKey: 'verandert' | 'retreat') => void;
   onExportMarkdown: () => void;
   isEditing: boolean;
   onToggleEditMode: () => void;
@@ -223,17 +223,6 @@ export const Header: React.FC<HeaderProps> = ({
                       <div className="px-3 py-1 font-bold text-stone-400 uppercase tracking-wider text-[10px]">
                         Template Presets
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onLoadPreset('intelligence');
-                          setShowPresetsMenu(false);
-                        }}
-                        className="w-full px-3 py-1.5 text-left text-stone-700 hover:bg-stone-50 flex items-center justify-between"
-                      >
-                        <span className="font-medium text-amber-900">Executive Brand Intelligence (262K Views)</span>
-                        {report.id === 'client-executive-intelligence-2026' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-                      </button>
                       <button
                         type="button"
                         onClick={() => {
