@@ -1,5 +1,6 @@
 import { SocialReportData } from '../types/report';
 export { initialReportState } from './initialReportState';
+export { executiveIntelligenceReport } from './intelligenceClientReport';
 
 export const verandertReport: SocialReportData = {
   id: 'latsky-client-sep-2026',

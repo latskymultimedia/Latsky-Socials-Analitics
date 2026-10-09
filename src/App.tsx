@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { initialReportState, verandertReport, artisanRetreatReport } from './data/mockReports';
+import { initialReportState, verandertReport, artisanRetreatReport, executiveIntelligenceReport } from './data/mockReports';
 import { 
   PlatformType, 
   SocialReportData, 
@@ -207,13 +207,17 @@ export default function App() {
     }
   };
 
-  const handleLoadPreset = (presetKey: 'verandert' | 'retreat') => {
-    const preset = presetKey === 'retreat' ? artisanRetreatReport : verandertReport;
+  const handleLoadPreset = (presetKey: 'verandert' | 'retreat' | 'intelligence') => {
+    const preset = presetKey === 'intelligence' 
+      ? executiveIntelligenceReport 
+      : presetKey === 'retreat' 
+      ? artisanRetreatReport 
+      : verandertReport;
     setReport(preset);
     setActiveReportView('overall');
-    setSelectedSummaryPlatforms(['instagram', 'youtube', 'tiktok', 'linkedin', 'facebook']);
+    setSelectedSummaryPlatforms(['facebook', 'instagram', 'tiktok', 'youtube', 'linkedin']);
     setIsEditing(false);
-    showToast(`Loaded ${preset.clientName} template report.`);
+    showToast(`Loaded ${preset.clientName} intelligence report.`);
   };
 
   const handleExportMarkdown = async () => {
