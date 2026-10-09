@@ -26,6 +26,7 @@ import { TikTokIcon } from './icons/TikTokIcon';
 import { PlatformType, SocialReportData, UploadedScreenshot, FileUploadType } from '../types/report';
 import { processUploadedFile, formatFileSize } from '../utils/fileUploadHelper';
 import { generateSynthesizedAgencyReport } from '../utils/reportSynthesizer';
+import { parseMetaCsvExports, applyMetaCsvToReport } from '../utils/metaCsvParser';
 import { ScreengrabGuide } from './ScreengrabGuide';
 import { ScreengrabPromptItem } from '../types/screengrabPrompts';
 
@@ -281,7 +282,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
         console.warn("Backend API unavailable on static hosting, switching to client-side synthesis...", apiError);
 
         // CLIENT-SIDE FALLBACK: Generates the report instantly in the browser
-        const localReport = generateSynthesizedAgencyReport({
+        const rawLocal = generateSynthesizedAgencyReport({
           clientName: payload.clientName,
           clientSubtitle: payload.clientSubtitle,
           reportPeriod: payload.reportPeriod,
@@ -292,6 +293,11 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
           imageNames: screenshots.map((s) => s.name),
           knownMetrics: payload.knownMetrics,
         });
+
+        const csvMetrics = parseMetaCsvExports(screenshots);
+        const localReport = csvMetrics.filesProcessed.length > 0
+          ? applyMetaCsvToReport(rawLocal, csvMetrics, payload.platforms)
+          : rawLocal;
 
         onReportGenerated(localReport, screenshots);
         onClose();
@@ -366,7 +372,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
       console.warn("Backend API unavailable on Vercel static hosting, switching to client-side synthesis...", apiError);
 
       // CLIENT-SIDE FALLBACK: Generates the report instantly in the browser
-      const localReport = generateSynthesizedAgencyReport({
+      const rawLocal = generateSynthesizedAgencyReport({
         clientName: payload.clientName,
         clientSubtitle: payload.clientSubtitle,
         reportPeriod: payload.reportPeriod,
@@ -377,6 +383,11 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
         imageNames: screenshots.map((s) => s.name),
         knownMetrics: payload.knownMetrics,
       });
+
+      const csvMetrics = parseMetaCsvExports(screenshots);
+      const localReport = csvMetrics.filesProcessed.length > 0
+        ? applyMetaCsvToReport(rawLocal, csvMetrics, payload.platforms)
+        : rawLocal;
 
       onReportGenerated(localReport, screenshots);
       onClose();

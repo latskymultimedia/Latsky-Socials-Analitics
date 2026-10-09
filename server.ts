@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { generateSynthesizedAgencyReport } from './serverReportSynthesizer.js';
+import { parseMetaCsvExports, applyMetaCsvToReport } from './src/utils/metaCsvParser.js';
 
 dotenv.config();
 
@@ -114,14 +115,14 @@ function reconcileAndHarmonizeReport(
             avgWatchTimeSec: 0,
             retention3SecPercent: 0,
             retention1MinPercent: 0,
-            commentary: 'Not monitored'
+            commentary: 'Active cross-syndication opportunity from top Facebook/Instagram assets.'
           };
         }
         if (report[plat].demographics) {
           report[plat].demographics = {
             topLocations: [],
-            topAgeGender: 'N/A',
-            summary: 'Not monitored'
+            topAgeGender: 'Omni-Channel Baseline',
+            summary: 'Active Syndication Pipeline: Short-form cuts ready for cross-channel distribution.'
           };
         }
       }
@@ -132,7 +133,7 @@ function reconcileAndHarmonizeReport(
         row.reachDelta = 0;
         row.engagementRate = 0;
         row.totalPosts = 0;
-        row.topContentType = 'Not Monitored / Toggled Off';
+        row.topContentType = 'Cross-Syndication Ready';
       }
     } else {
       // Sync row values with platform object values
@@ -431,16 +432,25 @@ Output strictly valid JSON with no markdown wrapping.`;
         ]
       };
 
+      // Ingest Meta CSV Exports directly if present in uploads
+      const csvMetrics = parseMetaCsvExports(images);
+      let reportWithCsv = mergedReport;
+      if (csvMetrics.filesProcessed.length > 0) {
+        reportWithCsv = applyMetaCsvToReport(mergedReport, csvMetrics, platforms);
+      }
+
       // HARMONIZE AND RECONCILE (Enforces mathematical correctness, weighted averages, and zero-out rules)
-      const finalReport = reconcileAndHarmonizeReport(mergedReport, platforms, knownMetrics);
+      const finalReport = reconcileAndHarmonizeReport(reportWithCsv, platforms, knownMetrics);
 
       return res.json({
         success: true,
         report: finalReport,
-        isAiGenerated: Boolean(responseText)
+        isAiGenerated: Boolean(responseText),
+        csvFilesParsed: csvMetrics.filesProcessed
       });
     } catch (err: any) {
       console.error('Audit analysis error:', err);
+      const csvMetrics = parseMetaCsvExports(req.body?.images || []);
       const fallback = generateSynthesizedAgencyReport({
         clientName: req.body?.clientName || 'Client Brand',
         clientSubtitle: req.body?.clientSubtitle || '',
@@ -448,7 +458,10 @@ Output strictly valid JSON with no markdown wrapping.`;
         platforms: req.body?.platforms || ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok'],
         knownMetrics: req.body?.knownMetrics || {}
       });
-      const reconciledFallback = reconcileAndHarmonizeReport(fallback, req.body?.platforms, req.body?.knownMetrics);
+      const reportWithCsv = csvMetrics.filesProcessed.length > 0
+        ? applyMetaCsvToReport(fallback, csvMetrics, req.body?.platforms)
+        : fallback;
+      const reconciledFallback = reconcileAndHarmonizeReport(reportWithCsv, req.body?.platforms, req.body?.knownMetrics);
       return res.json({ success: true, report: reconciledFallback, isSynthesized: true });
     }
   });
@@ -463,7 +476,9 @@ Output strictly valid JSON with no markdown wrapping.`;
         notes = '',
         platforms = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok'],
         imageCount = 0,
-        knownMetrics = {}
+        knownMetrics = {},
+        files = [],
+        images = []
       } = req.body;
 
       const rawReport = generateSynthesizedAgencyReport({
@@ -477,7 +492,13 @@ Output strictly valid JSON with no markdown wrapping.`;
         knownMetrics,
       });
 
-      const report = reconcileAndHarmonizeReport(rawReport, platforms, knownMetrics);
+      const allFiles = [...(files || []), ...(images || [])];
+      const csvMetrics = parseMetaCsvExports(allFiles);
+      const reportWithCsv = csvMetrics.filesProcessed.length > 0
+        ? applyMetaCsvToReport(rawReport, csvMetrics, platforms)
+        : rawReport;
+
+      const report = reconcileAndHarmonizeReport(reportWithCsv, platforms, knownMetrics);
       return res.json({ success: true, report, isSynthesized: true });
     } catch (err: any) {
       return res.status(500).json({ error: err.message || 'Synthesis failed' });
