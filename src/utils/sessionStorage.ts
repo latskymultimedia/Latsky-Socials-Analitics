@@ -364,7 +364,7 @@ export function createNewClientReport(
   const report: SocialReportData = {
     id: clientId,
     clientName: safeName,
-    clientSubtitle: clientSubtitle.trim(),
+    clientSubtitle: `SAMPLE DATA · ${clientSubtitle.trim()}`,
     clientLogoUrl: '',
     agencyName: 'Latsky Socials Intelligence',
     agencyLogoUrl: '',
@@ -378,10 +378,10 @@ export function createNewClientReport(
         'Short-form vertical video (Reels, TikTok, Shorts) prioritized as the primary discovery engine.',
         'High-value content pillars and conversion touchpoints identified for upcoming sprint.'
       ],
-      overallReach: 125000,
+      overallReach: 155000, // = sum of the five platform rows below (48,000 + 42,000 + 16,500 + 12,500 + 36,000)
       overallReachPrevDelta: 15.2,
       overallReachYoYDelta: 32.4,
-      overallEngagementRate: 4.8,
+      overallEngagementRate: 5.4, // reach-weighted average of the five platform rows below
       overallEngagementPrevDelta: 0.6,
       keyWins: [
         'Channel baseline analytics and cross-platform tracking successfully consolidated.',

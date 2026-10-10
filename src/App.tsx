@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { initialReportState, verandertReport, artisanRetreatReport } from './data/mockReports';
+import { initialReportState, verandertReport, artisanRetreatReport, executiveIntelligenceReport } from './data/mockReports';
 import { 
   PlatformType, 
   SocialReportData, 
@@ -207,8 +207,10 @@ export default function App() {
     }
   };
 
-  const handleLoadPreset = (presetKey: 'verandert' | 'retreat') => {
-    const preset = presetKey === 'retreat' 
+  const handleLoadPreset = (presetKey: 'verandert' | 'retreat' | 'intelligence') => {
+    const preset = presetKey === 'intelligence' 
+      ? executiveIntelligenceReport 
+      : presetKey === 'retreat' 
       ? artisanRetreatReport 
       : verandertReport;
     setReport(preset);

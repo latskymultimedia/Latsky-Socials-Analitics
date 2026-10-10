@@ -1,5 +1,6 @@
 import { SocialReportData } from '../types/report';
-import { parseMetric } from './metaCsvParser';
+import { parseMetric } from './parseMetric';
+import { normalizePlatforms } from './platforms';
 
 export interface SynthesisOptions {
   clientName: string;
@@ -19,19 +20,12 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
   const period = options.reportPeriod?.trim() || 'Current Reporting Period';
   const known = options.knownMetrics || {};
 
-  const requestedPlatforms = (options.platforms && options.platforms.length > 0)
-    ? options.platforms.map((p) => p.toLowerCase())
-    : ['youtube', 'instagram', 'linkedin', 'facebook', 'tiktok'];
-
+  // undefined -> all platforms; an explicit empty array -> none
+  const requestedPlatforms = normalizePlatforms(options.platforms);
   const isPlatformActive = (plat: string) => requestedPlatforms.includes(plat.toLowerCase());
 
-  // Strict helper: returns 0 if no explicit known metric or uploaded data exists. NO FAKE DEFAULTS.
-  const getStrictMetric = (key: string) => {
-    if (known[key] !== undefined && known[key] !== '') {
-      return parseMetric(known[key]);
-    }
-    return 0;
-  };
+  // Strict helper: returns 0 if no explicit known metric exists. NO FAKE DEFAULTS. Understands "12,500", "12.5K", "3.2%".
+  const getStrictMetric = (key: string) => parseMetric(known[key]) ?? 0;
 
   const platformsList = [
     { key: 'youtube', label: 'YouTube', subKey: 'youtubeSubscribers', growthKey: 'youtubeNetGrowth', reachKey: 'youtubeReach' },
@@ -52,7 +46,7 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
       reach: active ? getStrictMetric(p.reachKey) : 0,
       reachDelta: 0,
       engagementRate: 0,
-      topContentType: active ? 'Awaiting Data Export' : 'Cross-Syndication Ready',
+      topContentType: active ? 'Awaiting Data Export' : 'Not Monitored',
       totalPosts: 0
     };
   });
@@ -77,7 +71,7 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
     executiveSummary: {
       headlineTakeaways: [
         totalReach > 0 
-          ? `Active cross-platform reach is tracking at ${totalReach.toLocaleString()} unique views.`
+          ? `Combined platform reach (sum of platform figures, not de-duplicated) is ${totalReach.toLocaleString()}.`
           : `Awaiting screenshot uploads or data exports to populate live metrics.`
       ],
       overallReach: totalReach,
@@ -179,8 +173,8 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
       topPosts: [],
       demographics: {
         topLocations: [],
-        topAgeGender: 'Omni-Channel Baseline',
-        summary: 'Cross-syndication pipeline ready'
+        topAgeGender: 'Not provided',
+        summary: 'Not provided'
       },
       growthPlaybook: null
     },
@@ -196,7 +190,7 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
     audienceInsights: {
       growthQuality: 'Upload audience screenshots or CSV exports to analyze organic acquisition.',
       organicVsPaidRatio: 'Not provided',
-      demographicShifts: 'Audience concentrated in high-affinity metropolitan hubs.'
+      demographicShifts: 'Not provided'
     },
     competitiveBenchmark: {
       industryBenchmarkAvg: {
@@ -212,9 +206,7 @@ export function generateSynthesizedAgencyReport(options: SynthesisOptions): Soci
       testingPriorities: []
     },
     appendixRawMetrics: [
-      { metric: 'Total Cross-Platform Impressions', value: totalReach > 0 ? totalReach.toLocaleString() : '0', notes: 'Verified uploads only' },
-      { metric: 'Total Video Views (>3s)', value: '0', notes: 'Verified uploads only' },
-      { metric: 'Net Inbound Inquiries via Social Bio Links', value: '0', notes: 'Verified uploads only' }
+      { metric: 'Net Inbound Inquiries via Social Bio Links', value: 'Not provided', notes: 'No data supplied' }
     ]
   };
 }

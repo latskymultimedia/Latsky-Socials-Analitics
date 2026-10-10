@@ -1,7 +1,5 @@
 import { SocialReportData, PlatformType, ActionRecommendation, TacticalSuggestion } from '../types/report';
-import { formatNumber, formatPercent, escapeHtml } from './formatters';
-
-export { escapeHtml };
+import { formatNumber, formatPercent, escapeDeep } from './formatters';
 
 /**
  * Generates a clean, standalone, printable agency HTML report for the client.
@@ -10,16 +8,17 @@ export { escapeHtml };
  * When platformFilter is omitted or 'overall', it generates the multi-platform executive review.
  */
 export function generateStandaloneHtmlReport(
-  report: SocialReportData,
+  rawReport: SocialReportData,
   platformFilter?: PlatformType | 'overall'
 ): string {
+  // Every string in the report (client name, takeaways, AI text...) is HTML-escaped once, here, before it reaches a template.
+  const report = escapeDeep(rawReport) as SocialReportData;
   const isPlatformSpecific = Boolean(platformFilter && platformFilter !== 'overall');
   const targetPlatform: PlatformType = isPlatformSpecific ? (platformFilter as PlatformType) : 'general';
 
-  const clientEscaped = escapeHtml(report.clientName);
   const title = isPlatformSpecific
-    ? `${clientEscaped} - ${targetPlatform.toUpperCase()} Performance & Growth Blueprint`
-    : `${clientEscaped} - Monthly Social Performance Intelligence Report`;
+    ? `${report.clientName} - ${targetPlatform.toUpperCase()} Performance & Growth Blueprint`
+    : `${report.clientName} - Monthly Social Performance Intelligence Report`;
 
   const rows = report.crossPlatformOverview?.summaryTable || [];
   const recs = report.recommendations?.actionableItems || [];

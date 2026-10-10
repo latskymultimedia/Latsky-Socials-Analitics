@@ -27,8 +27,11 @@ export function compressImage(file: File, maxWidth = 2200, quality = 0.95): Prom
           return;
         }
 
+        // white background so transparent PNGs don't turn black when saved as JPEG
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
-        // Convert to compressed JPEG data URL
+        // Convert to compressed JPEG data URL (2200px / 0.95 keeps small dashboard numbers legible for OCR)
         resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.onerror = (error) => reject(error);
@@ -56,12 +59,17 @@ export function detectFileType(file: File): FileUploadType {
 }
 
 export function detectPlatformFromFileName(fileName: string, fallback: PlatformType = 'general'): PlatformType {
-  const nameLower = fileName.toLowerCase();
-  if (nameLower.includes('fb') || nameLower.includes('meta') || nameLower.includes('facebook')) return 'facebook';
-  if (nameLower.includes('ig') || nameLower.includes('insta') || nameLower.includes('instagram')) return 'instagram';
-  if (nameLower.includes('yt') || nameLower.includes('youtube') || nameLower.includes('studio')) return 'youtube';
-  if (nameLower.includes('li') || nameLower.includes('linkedin')) return 'linkedin';
-  if (nameLower.includes('tik') || nameLower.includes('tiktok')) return 'tiktok';
+  const lower = fileName.toLowerCase();
+  // short codes must match a whole word ("li" must not match "Link clicks" or "Likes")
+  const tokens = lower.split(/[^a-z0-9]+/).filter(Boolean);
+  const hasToken = (...words: string[]) => tokens.some((t) => words.includes(t));
+
+  if (lower.includes('facebook') || hasToken('fb')) return 'facebook';
+  if (lower.includes('instagram') || lower.includes('insta') || hasToken('ig')) return 'instagram';
+  if (lower.includes('youtube') || hasToken('yt')) return 'youtube';
+  if (lower.includes('linkedin') || hasToken('li')) return 'linkedin';
+  if (lower.includes('tiktok') || hasToken('tik', 'tt')) return 'tiktok';
+  // "meta" exports can contain Facebook AND Instagram, so they are deliberately left untagged
   return fallback;
 }
 

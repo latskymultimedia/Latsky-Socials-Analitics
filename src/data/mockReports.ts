@@ -1,5 +1,6 @@
 import { SocialReportData } from '../types/report';
 export { initialReportState } from './initialReportState';
+export { executiveIntelligenceReport } from './intelligenceClientReport';
 
 export const verandertReport: SocialReportData = {
   id: 'latsky-client-sep-2026',
@@ -202,7 +203,7 @@ export const verandertReport: SocialReportData = {
     netGrowth: 1820,
     followUnfollowRatio: '4.8:1 (2,300 follows / 480 unfollows)',
     reach: 215600,
-    impressions: 356000,
+    impressions: 342000,
     profileVisits: 14800,
     websiteTaps: 1390,
     formatSplit: [
@@ -757,7 +758,8 @@ export const verandertReport: SocialReportData = {
     source: 'firecrawl_live',
     sourcesScraped: [
       'https://www.premiumbeat.com/blog/cinematography-trends-2026',
-      'https://nofilmschool.com/documentary-distribution-algorithms'
+      'https://nofilmschool.com/documentary-distribution-algorithms',
+      'https://creatorhandbook.io/video-retention-benchmarks-2026'
     ],
     industryOverview: 'The independent cinema and commercial film sector in 2026 is experiencing a dramatic shift: polished "corporate showreels" suffer severe algorithmic fatigue, while granular "sensory craft deconstruction" (audio Foley, color grade transformations, lighting overhead diagrams) generates 4.2x higher viral discoverability across YouTube and Reels.',
     subGrowthPlaybook: 'In film and visual arts, viewers subscribe to educational transparency, not raw self-promotion. The #1 subscriber conversion vehicle is the "Recurring Micro-Series" (e.g. 52 Lighting Breakdowns or 10 Lessons from the Edit Suite) with an accompanying free digital asset (LUT pack, sound cues, or PDF diagram) linked in bio. Mid-roll value-anchored calls-to-action on YouTube convert at 3.8% compared to only 0.4% for generic end-card badges.',
@@ -950,7 +952,7 @@ export const artisanRetreatReport: SocialReportData = {
         id: 'ig-ret-2',
         title: 'Carousel: The Breakfast Basket (Warm Sourdough, Local Berries & Butter)',
         format: 'Carousel (6 slides)',
-        reach: 35100,
+        reach: 34200,
         engagementRate: 6.7,
         saves: 2900,
         shares: 580,
@@ -1124,7 +1126,7 @@ export const artisanRetreatReport: SocialReportData = {
         rank: 2,
         title: 'Breakfast Basket Tour (Instagram Carousel)',
         platform: 'instagram',
-        reach: 35100,
+        reach: 34200,
         engagementRate: 6.7,
         viralityScore: 84,
         whyItWorked: 'High culinary engagement and save rate.'

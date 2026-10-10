@@ -1,6 +1,21 @@
-export function escapeHtml(str: string | undefined | null): string {
-  if (!str) return '';
-  return String(str)
+export function formatNumber(num: number | undefined | null): string {
+  if (num === undefined || num === null || isNaN(num)) return '0';
+  const abs = Math.abs(num);
+  if (abs >= 1_000_000) {
+    return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (abs >= 1_000) {
+    // round FIRST, so 999,999 becomes "1M" instead of "1000K"
+    const k = Number((num / 1_000).toFixed(1));
+    if (Math.abs(k) >= 1_000) return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+    return String(k) + 'K';
+  }
+  return num.toLocaleString();
+}
+
+/** Escapes text for safe insertion into HTML (&, <, >, ", '). */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -8,15 +23,16 @@ export function escapeHtml(str: string | undefined | null): string {
     .replace(/'/g, '&#39;');
 }
 
-export function formatNumber(num: number | undefined | null): string {
-  if (num === undefined || num === null || isNaN(num)) return '0';
-  if (Math.abs(num) >= 1_000_000) {
-    return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+/** Returns a deep copy of any value with every string HTML-escaped. */
+export function escapeDeep<T>(node: T): T {
+  if (typeof node === 'string') return escapeHtml(node) as unknown as T;
+  if (Array.isArray(node)) return node.map((n) => escapeDeep(n)) as unknown as T;
+  if (node && typeof node === 'object') {
+    const out: any = {};
+    for (const [k, v] of Object.entries(node as any)) out[k] = escapeDeep(v);
+    return out;
   }
-  if (Math.abs(num) >= 1_000) {
-    return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
-  }
-  return num.toLocaleString();
+  return node;
 }
 
 export function formatExactNumber(num: number | undefined | null): string {
