@@ -6,7 +6,9 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { generateSynthesizedAgencyReport } from './serverReportSynthesizer.js';
-import { parseMetaCsvExports, applyMetaCsvToReport, parseMetric } from './src/utils/metaCsvParser.js';
+import { parseMetaCsvExports, applyMetaCsvFilesToReport } from './src/utils/metaCsvParser.js';
+import { reconcileAndHarmonizeReport } from './src/utils/reconcile.js';
+import { normalizePlatforms } from './src/utils/platforms.js';
 
 dotenv.config();
 
@@ -22,206 +24,27 @@ const ai = new GoogleGenAI({
   }
 });
 
-/**
- * Reconciles and harmonizes all social metrics:
- * 1. Synchronizes summaryTable with platform-specific fields.
- * 2. STRICTLY zeros out any platform that is NOT in requestedPlatforms or has 0 followers/reach.
- * 3. Deterministically computes overallReach as the true mathematical sum of active tracked platforms.
- * 4. Computes true reach-weighted engagement rates to eliminate AI calculation errors.
- */
-function reconcileAndHarmonizeReport(
-  report: any,
-  requestedPlatforms: string[] = [],
-  knownMetrics: Record<string, any> = {}
-) {
-  if (!report) return report;
+// Gemini models: first the GEMINI_MODEL env var (if set), then the fallback list. One place to change them for ALL routes.
+const GEMINI_MODELS: string[] = [
+  process.env.GEMINI_MODEL || '',
+  'gemini-3.8-flash',
+  'gemini-flash-latest',
+  'gemini-3.1-flash-lite'
+].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
-  const validPlatforms = ['youtube', 'instagram', 'linkedin', 'facebook', 'tiktok'];
-  // Empty platforms array should NOT default to all platforms; empty means no active platforms requested
-  const targets = Array.isArray(requestedPlatforms)
-    ? requestedPlatforms.map((p) => p.toLowerCase())
-    : validPlatforms;
-
-  const isPlatformActive = (plat: string) => targets.includes(plat.toLowerCase());
-
-  if (!report.crossPlatformOverview) report.crossPlatformOverview = {};
-  if (!Array.isArray(report.crossPlatformOverview.summaryTable)) {
-    report.crossPlatformOverview.summaryTable = [];
+async function generateWithFallback(params: { contents: any; config?: any }): Promise<{ text: string; model: string }> {
+  let lastErr: any = null;
+  for (const model of GEMINI_MODELS) {
+    try {
+      const response = await ai.models.generateContent({ model, ...params });
+      const text = response.text || '';
+      if (text) return { text, model };
+    } catch (err) {
+      lastErr = err;
+      console.warn(`Model ${model} failed, trying next...`, (err as any)?.message || err);
+    }
   }
-
-  const defaultLabels: Record<string, string> = {
-    youtube: 'YouTube',
-    instagram: 'Instagram',
-    linkedin: 'LinkedIn',
-    facebook: 'Facebook',
-    tiktok: 'TikTok'
-  };
-
-  // Ensure each platform row exists
-  validPlatforms.forEach((plat) => {
-    let row = report.crossPlatformOverview.summaryTable.find(
-      (r: any) => r && r.platform && r.platform.toLowerCase() === plat
-    );
-    if (!row) {
-      row = {
-        platform: plat,
-        platformLabel: defaultLabels[plat],
-        followers: 0,
-        followersDelta: 0,
-        reach: 0,
-        reachDelta: 0,
-        engagementRate: 0,
-        topContentType: 'Not Monitored',
-        totalPosts: 0
-      };
-      report.crossPlatformOverview.summaryTable.push(row);
-    }
-  });
-
-  // STEP 1: SYNC PRIOR TO ZERO-OUT & APPLY KNOWN METRICS PRECEDENCE
-  validPlatforms.forEach((plat) => {
-    const row = report.crossPlatformOverview.summaryTable.find((r: any) => r.platform?.toLowerCase() === plat);
-    if (!row) return;
-
-    if (report[plat]) {
-      const subsOrFollowers = parseMetric(report[plat].subscribers || report[plat].followers || row.followers);
-      const netDelta = parseMetric(report[plat].netGrowth || row.followersDelta);
-      const reachVal = parseMetric(report[plat].reach || report[plat].impressions || report[plat].videoViews || row.reach);
-      const engVal = parseMetric(report[plat].engagementRate || row.engagementRate);
-
-      report[plat].followers = subsOrFollowers;
-      if (report[plat].subscribers !== undefined) report[plat].subscribers = subsOrFollowers;
-      report[plat].netGrowth = netDelta;
-
-      row.followers = subsOrFollowers;
-      row.followersDelta = netDelta;
-      row.reach = reachVal;
-      row.engagementRate = engVal;
-    }
-
-    // Apply known user metrics with strict top precedence
-    if (knownMetrics[`${plat}Subscribers`] !== undefined && knownMetrics[`${plat}Subscribers`] !== '') {
-      const kmSubs = parseMetric(knownMetrics[`${plat}Subscribers`]);
-      if (report[plat]) report[plat].subscribers = kmSubs;
-      row.followers = kmSubs;
-    }
-    if (knownMetrics[`${plat}Followers`] !== undefined && knownMetrics[`${plat}Followers`] !== '') {
-      const kmFollowers = parseMetric(knownMetrics[`${plat}Followers`]);
-      if (report[plat]) report[plat].followers = kmFollowers;
-      row.followers = kmFollowers;
-    }
-    if (knownMetrics[`${plat}NetGrowth`] !== undefined && knownMetrics[`${plat}NetGrowth`] !== '') {
-      const kmNet = parseMetric(knownMetrics[`${plat}NetGrowth`]);
-      if (report[plat]) report[plat].netGrowth = kmNet;
-      row.followersDelta = kmNet;
-    }
-    if (knownMetrics[`${plat}Reach`] !== undefined && knownMetrics[`${plat}Reach`] !== '') {
-      const kmReach = parseMetric(knownMetrics[`${plat}Reach`]);
-      if (report[plat]) report[plat].reach = kmReach;
-      row.reach = kmReach;
-    }
-  });
-
-  // STEP 2: RECURSIVE ZERO-OUT OF INACTIVE PLATFORMS (INCLUDING reachOrganic, reachPaid & stale deltas)
-  validPlatforms.forEach((plat) => {
-    const row = report.crossPlatformOverview.summaryTable.find((r: any) => r.platform?.toLowerCase() === plat);
-    const active = isPlatformActive(plat);
-
-    if (!active) {
-      if (report[plat]) {
-        report[plat].followers = 0;
-        report[plat].subscribers = 0;
-        report[plat].netGrowth = 0;
-        report[plat].reach = 0;
-        report[plat].reachOrganic = 0;
-        report[plat].reachPaid = 0;
-        report[plat].impressions = 0;
-        report[plat].videoViews = 0;
-        report[plat].views = 0;
-        report[plat].watchTimeHours = 0;
-        report[plat].engagementRate = 0;
-        report[plat].topPosts = [];
-        report[plat].topVideos = [];
-        report[plat].postFormats = [];
-        report[plat].formatSplit = [];
-        report[plat].trafficSources = [];
-        report[plat].contentTypes = [];
-        report[plat].growthPlaybook = null;
-        if (report[plat].videoMetrics) {
-          report[plat].videoMetrics = {
-            views: 0,
-            avgWatchTimeSec: 0,
-            retention3SecPercent: 0,
-            retention1MinPercent: 0,
-            commentary: 'Active cross-syndication opportunity.'
-          };
-        }
-        if (report[plat].demographics) {
-          report[plat].demographics = {
-            topLocations: [],
-            topAgeGender: 'Omni-Channel Baseline',
-            summary: 'Cross-syndication pipeline.'
-          };
-        }
-      }
-      if (row) {
-        row.followers = 0;
-        row.followersDelta = 0;
-        row.reach = 0;
-        row.reachDelta = 0;
-        row.engagementRate = 0;
-        row.totalPosts = 0;
-        row.topContentType = 'Not Monitored';
-      }
-    } else if (row && row.followers === 0 && row.reach === 0) {
-      // Clear stale delta fields if no followers or reach present
-      row.followersDelta = 0;
-      row.reachDelta = 0;
-      row.engagementRate = 0;
-      if (report[plat]) {
-        report[plat].netGrowth = 0;
-        report[plat].reachOrganic = 0;
-        report[plat].reachPaid = 0;
-        report[plat].engagementRate = 0;
-      }
-    }
-  });
-
-  // DETERMINISTICALLY RECALCULATE EXECUTIVE SUMMARY TOTALS (NO AI MATH ERRORS)
-  if (!report.executiveSummary) report.executiveSummary = {};
-  
-  const activeRows = report.crossPlatformOverview.summaryTable.filter(
-    (r: any) => isPlatformActive(r.platform) && (parseMetric(r.followers) > 0 || parseMetric(r.reach) > 0)
-  );
-
-  const totalCalculatedReach = activeRows.reduce((sum: number, r: any) => sum + parseMetric(r.reach), 0);
-  report.executiveSummary.overallReach = totalCalculatedReach;
-
-  const weightedEngSum = activeRows.reduce(
-    (sum: number, r: any) => sum + (parseMetric(r.reach) * parseMetric(r.engagementRate)),
-    0
-  );
-
-  if (totalCalculatedReach > 0) {
-    report.executiveSummary.overallEngagementRate = Number((weightedEngSum / totalCalculatedReach).toFixed(1));
-  } else {
-    report.executiveSummary.overallEngagementRate = 0.0;
-  }
-
-  // Filter cross-platform top posts and recommendations to only active platforms
-  if (report.contentPerformance?.topPostsAllPlatforms && Array.isArray(report.contentPerformance.topPostsAllPlatforms)) {
-    report.contentPerformance.topPostsAllPlatforms = report.contentPerformance.topPostsAllPlatforms.filter(
-      (p: any) => p && p.platform && isPlatformActive(p.platform)
-    );
-  }
-
-  if (report.recommendations?.actionableItems && Array.isArray(report.recommendations.actionableItems)) {
-    report.recommendations.actionableItems = report.recommendations.actionableItems.filter(
-      (item: any) => !item.platform || isPlatformActive(item.platform.toLowerCase())
-    );
-  }
-
-  return report;
+  throw lastErr || new Error('All Gemini models returned an empty response');
 }
 
 async function startServer() {
@@ -269,9 +92,14 @@ async function startServer() {
         reportPeriod = 'Current Month',
         goals = '',
         notes = '',
-        platforms = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok'],
+        platforms: requestedPlatforms = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok'],
         knownMetrics = {}
       } = req.body;
+
+      const platforms = normalizePlatforms(requestedPlatforms);
+      if (platforms.length === 0) {
+        return res.status(400).json({ error: 'Select at least one platform to monitor.' });
+      }
 
       if (!Array.isArray(images) || images.length === 0) {
         return res.status(400).json({
@@ -294,11 +122,13 @@ async function startServer() {
         if (isCsv) {
           let text = img.textContent || '';
           if (!text && img.dataUrl && img.dataUrl.includes(',')) {
-            const split = img.dataUrl.split(',');
+            const comma = img.dataUrl.indexOf(',');
+            const meta = img.dataUrl.slice(0, comma);
+            const payload = img.dataUrl.slice(comma + 1);
             try {
-              text = Buffer.from(split[1], 'base64').toString('utf-8');
+              text = /;base64/i.test(meta) ? Buffer.from(payload, 'base64').toString('utf-8') : decodeURIComponent(payload);
             } catch {
-              text = split[1];
+              text = '';
             }
           }
           if (text) {
@@ -386,24 +216,18 @@ Produce strictly valid JSON adhering to this structure:
 }
 Output strictly valid JSON with no markdown wrapping.`;
 
-      const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
       let responseText = '';
-
-      for (const model of candidateModels) {
-        try {
-          const response = await ai.models.generateContent({
-            model,
-            contents: { parts: [...multimodalParts, { text: auditPrompt }] },
-            config: {
-              systemInstruction: 'You are an expert agency analyst. Output strictly valid JSON matching the requested schema with zero markdown formatting backticks.',
-              responseMimeType: 'application/json'
-            }
-          });
-          responseText = response.text || '';
-          if (responseText) break;
-        } catch (err) {
-          console.warn(`Model ${model} failed, trying next...`, err);
-        }
+      try {
+        const out = await generateWithFallback({
+          contents: { parts: [...multimodalParts, { text: auditPrompt }] },
+          config: {
+            systemInstruction: 'You are an expert agency analyst. Output strictly valid JSON matching the requested schema with zero markdown formatting backticks.',
+            responseMimeType: 'application/json'
+          }
+        });
+        responseText = out.text;
+      } catch (aiErr: any) {
+        console.warn('All AI models failed:', aiErr?.message || aiErr);
       }
 
       let parsedData: any = null;
@@ -445,56 +269,47 @@ Output strictly valid JSON with no markdown wrapping.`;
           detectedPlatform: img.platform || 'general',
           screenType: `${(img.platform || 'Social').toUpperCase()} Dashboard Screenshot`
         })),
-        crisisFixHooks: parsedData?.crisisFixHooks || [
-          {
-            platform: 'Instagram',
-            weaknessFound: 'Drop-off at second 3 on Reels; viewers scrolling before value pitch',
-            hookSolution: 'Open with immediate frame motion: "Stop doing X if you want Y" text overlay in first 1.5 seconds.'
-          },
-          {
-            platform: 'YouTube',
-            weaknessFound: 'CTR below 4% on browse features; thumbnail text too small on mobile',
-            hookSolution: 'Crop thumbnail subject 30% closer; reduce title words to under 45 characters with high-curiosity keyword.'
-          },
-          {
-            platform: 'TikTok',
-            weaknessFound: 'Completion rate dipping on videos over 25 seconds',
-            hookSolution: 'Insert micro-pattern interrupt (B-roll cut + sound effect) every 4 seconds to reset attention clock.'
-          }
-        ]
+        crisisFixHooks: Array.isArray(parsedData?.crisisFixHooks) ? parsedData.crisisFixHooks : []
       };
 
-      // Ingest Meta CSV Exports directly if present in uploads
-      const csvMetrics = parseMetaCsvExports(images);
-      let reportWithCsv = mergedReport;
-      if (csvMetrics.filesProcessed.length > 0) {
-        reportWithCsv = applyMetaCsvToReport(mergedReport, csvMetrics, platforms);
-      }
+      // Ingest Meta CSV exports (each CSV is applied only to the platform it is tagged with)
+      const { report: reportWithCsv, filesProcessed } = applyMetaCsvFilesToReport(mergedReport, images, platforms);
 
-      // HARMONIZE AND RECONCILE (Enforces mathematical correctness, weighted averages, and zero-out rules)
+      // Provenance for the UI / exports
+      const dataQuality: any = (reportWithCsv as any).dataQuality || { isFallback: false, warnings: [], sources: [] };
+      dataQuality.isFallback = !parsedData;
+      if (parsedData && !dataQuality.sources.includes('ai')) dataQuality.sources.push('ai');
+      if (!parsedData) dataQuality.warnings.push('AI analysis did not return usable data. This report contains only CSV and manually entered figures.');
+      (reportWithCsv as any).dataQuality = dataQuality;
+
+      // HARMONIZE AND RECONCILE (single source of truth for all maths)
       const finalReport = reconcileAndHarmonizeReport(reportWithCsv, platforms, knownMetrics);
 
       return res.json({
         success: true,
         report: finalReport,
         isAiGenerated: Boolean(parsedData),
-        csvFilesParsed: csvMetrics.filesProcessed
+        isFallback: !parsedData,
+        csvFilesParsed: filesProcessed
       });
     } catch (err: any) {
       console.error('Audit analysis error:', err);
-      const csvMetrics = parseMetaCsvExports(req.body?.images || []);
+      const platforms = normalizePlatforms(req.body?.platforms);
       const fallback = generateSynthesizedAgencyReport({
         clientName: req.body?.clientName || 'Client Brand',
         clientSubtitle: req.body?.clientSubtitle || '',
         reportPeriod: req.body?.reportPeriod || 'Current Month',
-        platforms: req.body?.platforms || ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok'],
+        platforms,
         knownMetrics: req.body?.knownMetrics || {}
       });
-      const reportWithCsv = csvMetrics.filesProcessed.length > 0
-        ? applyMetaCsvToReport(fallback, csvMetrics, req.body?.platforms)
-        : fallback;
-      const reconciledFallback = reconcileAndHarmonizeReport(reportWithCsv, req.body?.platforms, req.body?.knownMetrics);
-      return res.json({ success: true, report: reconciledFallback, isSynthesized: true });
+      const { report: withCsv } = applyMetaCsvFilesToReport(fallback, req.body?.images || [], platforms);
+      (withCsv as any).dataQuality = {
+        isFallback: true,
+        warnings: [`Analysis failed (${err?.message || 'unknown error'}). This report contains only CSV and manually entered figures.`],
+        sources: []
+      };
+      const reconciledFallback = reconcileAndHarmonizeReport(withCsv, platforms, req.body?.knownMetrics);
+      return res.json({ success: true, report: reconciledFallback, isSynthesized: true, isFallback: true });
     }
   });
 
@@ -506,12 +321,17 @@ Output strictly valid JSON with no markdown wrapping.`;
         reportPeriod = 'Current Month',
         goals = '',
         notes = '',
-        platforms = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok'],
+        platforms: requestedPlatforms = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok'],
         imageCount = 0,
         knownMetrics = {},
         files = [],
         images = []
       } = req.body;
+
+      const platforms = normalizePlatforms(requestedPlatforms);
+      if (platforms.length === 0) {
+        return res.status(400).json({ error: 'Select at least one platform to monitor.' });
+      }
 
       const rawReport = generateSynthesizedAgencyReport({
         clientName,
@@ -525,10 +345,7 @@ Output strictly valid JSON with no markdown wrapping.`;
       });
 
       const allFiles = [...(files || []), ...(images || [])];
-      const csvMetrics = parseMetaCsvExports(allFiles);
-      const reportWithCsv = csvMetrics.filesProcessed.length > 0
-        ? applyMetaCsvToReport(rawReport, csvMetrics, platforms)
-        : rawReport;
+      const { report: reportWithCsv } = applyMetaCsvFilesToReport(rawReport, allFiles, platforms);
 
       const report = reconcileAndHarmonizeReport(reportWithCsv, platforms, knownMetrics);
       return res.json({ success: true, report, isSynthesized: true });
@@ -549,6 +366,7 @@ Output strictly valid JSON with no markdown wrapping.`;
 
       let markdownContent = '';
       let crawlTitle = '';
+      let scrapedLive = false;
 
       if (firecrawlKey && firecrawlKey !== 'fc-YOUR_FIRECRAWL_KEY') {
         try {
@@ -574,6 +392,7 @@ Output strictly valid JSON with no markdown wrapping.`;
           const fcData = await fcResponse.json();
           markdownContent = fcData?.data?.markdown || '';
           crawlTitle = fcData?.data?.metadata?.title || url;
+          scrapedLive = Boolean(markdownContent);
         } catch (fcErr: any) {
           console.warn('Firecrawl API request failed, falling back to simulated extraction:', fcErr.message);
         }
@@ -594,12 +413,9 @@ Synthesize a thorough competitor/benchmark breakdown:
 
 Format in concise, executive bullet points.`;
 
-        const simResponse = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: researchPrompt,
-        });
+        const simResponse = await generateWithFallback({ contents: researchPrompt });
 
-        markdownContent = simResponse.text || 'Competitor profile extracted successfully.';
+        markdownContent = simResponse.text || 'No content could be retrieved for this URL.';
         crawlTitle = `Benchmark Analysis: ${new URL(url.startsWith('http') ? url : `https://${url}`).hostname}`;
       }
 
@@ -620,8 +436,7 @@ Extract or generate a structured competitor benchmark entry adhering to JSON:
   "rawSummary": "A 2-3 sentence overview of findings from their online footprint."
 }`;
 
-      const aiResponse = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+      const aiResponse = await generateWithFallback({
         contents: analysisPrompt,
         config: {
           responseMimeType: 'application/json',
@@ -633,7 +448,8 @@ Extract or generate a structured competitor benchmark entry adhering to JSON:
 
       return res.json({
         success: true,
-        source: firecrawlKey ? 'firecrawl' : 'ai-enhanced',
+        source: scrapedLive ? 'firecrawl' : 'ai-estimate',
+        isEstimate: !scrapedLive, // true = the page was NOT actually fetched; figures are AI estimates
         benchmark: parsedBenchmark,
         rawMarkdown: markdownContent.slice(0, 3000),
       });
@@ -844,8 +660,7 @@ Produce strictly valid JSON with this exact schema:
 }
 `;
 
-      const aiResponse = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+      const aiResponse = await generateWithFallback({
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -860,7 +675,8 @@ Produce strictly valid JSON with this exact schema:
         source: sourceOrigin,
         industryIntel: parsed.industryIntel,
         platformPlaybooks: parsed.platformPlaybooks,
-        sourcesScraped,
+        sourcesScraped, // empty when nothing was scraped. Never padded with invented URLs
+        isLiveSourced: sourcesScraped.length > 0,
       });
     } catch (err: any) {
       console.error('Industry web intel error:', err);
