@@ -32,6 +32,7 @@ export interface MetaAggregatedMetrics {
   netFollowers: number;
   totalInteractions: number;
   totalLinkClicks: number;
+  totalVisits: number;
   calculatedEngagementRate: number;
   formatSplits: ParsedFormatSplit[];
   demographics: ParsedDemographics;
@@ -39,7 +40,7 @@ export interface MetaAggregatedMetrics {
   warnings?: string[];
 }
 
-export type MetaCsvType = 'views' | 'viewers' | 'follows' | 'interactions' | 'link_clicks' | 'formats' | 'audience' | 'unknown';
+export type MetaCsvType = 'views' | 'visits' | 'viewers' | 'follows' | 'interactions' | 'link_clicks' | 'formats' | 'audience' | 'unknown';
 
 /** Kept for backwards compatibility. Unknown / unparseable -> 0. */
 export function parseCleanNumber(val: any): number {
@@ -49,7 +50,7 @@ export function parseCleanNumber(val: any): number {
 function emptyMetrics(): MetaAggregatedMetrics {
   return {
     totalViews: 0, totalUniqueViewers: 0, organicReach: 0, paidReach: 0, netFollowers: 0,
-    totalInteractions: 0, totalLinkClicks: 0, calculatedEngagementRate: 0, formatSplits: [],
+    totalInteractions: 0, totalLinkClicks: 0, totalVisits: 0, calculatedEngagementRate: 0, formatSplits: [],
     demographics: { genderWomenPct: 0, genderMenPct: 0, topAgeBrackets: [], topCities: [], topCountries: [] },
     filesProcessed: [], warnings: []
   };
@@ -61,12 +62,14 @@ const isThousandsOnly = (line: string) => /^\s*[+-]?\d{1,3}(,\d{3})+(\.\d+)?\s*%
 /** CSV/TSV -> rows. Detects the delimiter once per file, handles quotes, "" escapes and a leading "sep=" line. */
 export function parseCsvToRows(rawText: string): string[][] {
   if (!rawText) return [];
-  const lines = rawText.replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim() !== '');
+  const lines = rawText.replace(/\u0000/g, '').replace(/^\uFEFF/, '').split(/\r\n|\n|\r/).filter((l) => l.trim() !== '');
   if (lines.length === 0) return [];
 
   let delimiter: string | null = null;
-  const sepMatch = lines[0].match(/^sep=(.)$/i);
-  if (sepMatch) { delimiter = sepMatch[1]; lines.shift(); }
+  for (let i = 0; i < Math.min(3, lines.length); i++) {
+    const sepMatch = lines[i].trim().match(/^"?sep=(.)"?$/i);
+    if (sepMatch) { delimiter = sepMatch[1]; lines.splice(i, 1); break; }
+  }
 
   if (!delimiter) {
     const sample = lines.slice(0, 10).join('\n');
@@ -110,6 +113,7 @@ export function classifyMetaCsvType(fileName: string, firstFewLines: string): Me
   if (/format/.test(name)) return 'formats';
   if (/audience|demographic/.test(name)) return 'audience';
   if (/link click|outbound|website tap|clicks/.test(name)) return 'link_clicks';
+  if (/visit/.test(name)) return 'visits';
   if (/viewer|reach/.test(name)) return 'viewers';
   if (/\bviews?\b|impression/.test(name)) return 'views';
   if (/follow/.test(name)) return 'follows';
@@ -118,6 +122,7 @@ export function classifyMetaCsvType(fileName: string, firstFewLines: string): Me
   if (/\b(content|post) formats?\b/.test(head)) return 'formats';
   if (/\b(women|men|female|male|cities|city|countries|country|age)\b/.test(head)) return 'audience';
   if (/\b(link clicks?|outbound clicks?|website taps?)\b/.test(head)) return 'link_clicks';
+  if (/\b(profile visits?|page visits?|visits)\b/.test(head)) return 'visits';
   if (/\b(unique viewers|viewers|accounts reached|reach)\b/.test(head)) return 'viewers';
   if (/\b(views|impressions)\b/.test(head)) return 'views';
   if (/\b(follows|unfollows|followers)\b/.test(head)) return 'follows';
@@ -163,14 +168,44 @@ function pickColumns(t: Table, pattern: RegExp, exact: RegExp): number[] {
   return [];
 }
 
-function metricFromTable(t: Table, pattern: RegExp, exact: RegExp): number {
-  const cols = pickColumns(t, pattern, exact);
-  if (cols.length === 0) return 0;
-  if (t.totals) {
-    const fromTotals = cols.reduce((s, i) => s + (parseMetric(t.totals![i]) ?? 0), 0);
-    if (fromTotals !== 0) return fromTotals;
+/** What the parser actually saw, for error messages ("columns found ..."). */
+function describeTable(t: Table): string {
+  const clip = (v: string) => (v.length > 24 ? v.slice(0, 24) + '…' : v);
+  const cols = t.headers.slice(0, 6).map((h) => `"${clip(h)}"`).join(', ') || 'none';
+  const first = (t.data[0] || []).slice(0, 6).map((c) => `"${clip(c)}"`).join(', ') || 'none';
+  return `columns found: ${cols}; first data row: ${first}`;
+}
+
+/** Fallback when no header matches: the column (after the date column) holding the most numeric cells. */
+function bestNumericColumn(t: Table): number {
+  const width = Math.max(t.headers.length, ...t.data.map((r) => r.length));
+  let best = -1, bestCount = 0;
+  for (let i = 1; i < width; i++) {
+    const count = t.data.filter((r) => parseMetric(r[i]) !== null).length;
+    if (count > bestCount) { best = i; bestCount = count; }
   }
-  return cols.reduce((s, i) => s + sumCol(t, i), 0);
+  return best;
+}
+
+function metricFromTable(t: Table, pattern: RegExp, exact: RegExp, note?: (m: string) => void): number {
+  const cols = pickColumns(t, pattern, exact);
+  let result = 0;
+  if (cols.length > 0) {
+    if (t.totals) {
+      const fromTotals = cols.reduce((s, i) => s + (parseMetric(t.totals![i]) ?? 0), 0);
+      if (fromTotals !== 0) return fromTotals;
+    }
+    result = cols.reduce((s, i) => s + sumCol(t, i), 0);
+  }
+  if (result === 0) {
+    // header names were not what we expected: fall back to the numeric column
+    const i = bestNumericColumn(t);
+    if (i >= 0) {
+      const fb = t.totals ? (parseMetric(t.totals[i]) ?? sumCol(t, i)) : sumCol(t, i);
+      if (fb !== 0) { note?.(`used column "${t.headers[i] ?? i}" (no header matched)`); return fb; }
+    }
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------- main ingestion
@@ -180,6 +215,7 @@ export function parseMetaCsvExports(
 ): MetaAggregatedMetrics {
   const result = emptyMetrics();
   const warnings = result.warnings!;
+  const seenTypes = new Set<string>();
 
   for (const file of files || []) {
     let text = file.textContent || '';
@@ -205,11 +241,28 @@ export function parseMetaCsvExports(
     if (fileType === 'unknown') { warnings.push(`${file.name}: file type not recognised, skipped.`); continue; }
 
     const t = readTable(rows);
+    const diag = describeTable(t);
+    const noteFor = (m: string) => warnings.push(`${file.name}: ${m}.`);
+
+    // the same kind of export twice in one group usually means two platforms were uploaded untagged
+    if (fileType !== 'audience' && fileType !== 'formats') {
+      if (seenTypes.has(fileType)) {
+        warnings.push(`${file.name}: a ${fileType} file was already read for this group, so this one was skipped. Upload each platform's files under that platform's own tag.`);
+        continue;
+      }
+      seenTypes.add(fileType);
+    }
 
     if (fileType === 'views') {
-      const v = metricFromTable(t, /view|impression/, /^(total )?(content )?(views|impressions)$|^primary$|^total$/);
-      if (v > 0) result.totalViews = Math.max(result.totalViews, v);
-      else warnings.push(`${file.name}: no readable views column.`);
+      const v = metricFromTable(t, /view|impression/, /^(total )?(content )?(views|impressions)$|^primary$|^total$/, noteFor);
+      if (v > 0) result.totalViews = v;
+      else warnings.push(`${file.name}: no readable views column (${diag}).`);
+    }
+
+    if (fileType === 'visits') {
+      const v = metricFromTable(t, /visit/, /^(total )?(profile |page )?visits$|^primary$|^total$/, noteFor);
+      if (v > 0) result.totalVisits = v;
+      else warnings.push(`${file.name}: no readable visits column (${diag}).`);
     }
 
     if (fileType === 'viewers') {
@@ -219,7 +272,7 @@ export function parseMetaCsvExports(
       if (t.totals && cols.length) total = parseMetric(t.totals[cols[0]]) ?? 0;
       else if (cols.length && t.data.length === 1) total = parseMetric(t.data[0][cols[0]]) ?? 0;
       if (total > 0) result.totalUniqueViewers = Math.max(result.totalUniqueViewers, total);
-      else if (cols.length) warnings.push(`${file.name}: contains daily unique viewers, which cannot be summed into a period total. Enter period reach manually or upload the period-total export.`);
+      else if (cols.length) warnings.push(`${file.name}: contains daily unique viewers, which cannot be summed into a period total. Enter period reach manually or upload the period-total export (${diag}).`);
 
       // organic / paid split (used as a ratio only)
       const oc = colIndexes(t, /organic/);
@@ -255,13 +308,13 @@ export function parseMetaCsvExports(
     }
 
     if (fileType === 'interactions') {
-      const v = metricFromTable(t, /interaction|like|comment|share|save|reaction|engagement/, /^(total )?interactions$|^primary$|^total$/);
-      if (v > 0) result.totalInteractions = v; else warnings.push(`${file.name}: no readable interactions column.`);
+      const v = metricFromTable(t, /interaction|like|comment|share|save|reaction|engagement/, /^(total )?interactions$|^primary$|^total$/, noteFor);
+      if (v > 0) result.totalInteractions = v; else warnings.push(`${file.name}: no readable interactions column (${diag}).`);
     }
 
     if (fileType === 'link_clicks') {
-      const v = metricFromTable(t, /click|tap/, /^(total )?(link |outbound )?clicks$|^primary$|^total$/);
-      if (v > 0) result.totalLinkClicks = v; else warnings.push(`${file.name}: no readable clicks column.`);
+      const v = metricFromTable(t, /click|tap/, /^(total )?(link |outbound )?clicks$|^primary$|^total$/, noteFor);
+      if (v > 0) result.totalLinkClicks = v; else warnings.push(`${file.name}: no readable clicks column (${diag}).`);
     }
 
     if (fileType === 'formats') {
@@ -395,6 +448,7 @@ export function applyMetaCsvToReport(
   if (m.totalViews > 0) addAppx('Content views', m.totalViews.toLocaleString());
   if (m.totalUniqueViewers > 0) addAppx('Unique viewers', m.totalUniqueViewers.toLocaleString());
   if (m.totalLinkClicks > 0) addAppx('Link clicks', m.totalLinkClicks.toLocaleString());
+  if (m.totalVisits > 0) addAppx('Profile / page visits', m.totalVisits.toLocaleString());
   if (m.netFollowers !== 0) addAppx('Net follower change', `${m.netFollowers > 0 ? '+' : ''}${m.netFollowers.toLocaleString()}`);
   if (m.totalInteractions > 0) addAppx('Interactions', m.totalInteractions.toLocaleString());
   if (genderStr) addAppx('Gender split', genderStr);
@@ -434,6 +488,10 @@ export function applyMetaCsvToReport(
     if (row) row.engagementRate = m.calculatedEngagementRate;
   }
   if (target === 'instagram' && obj && m.totalLinkClicks > 0) obj.websiteTaps = m.totalLinkClicks;
+  if (m.totalVisits > 0 && obj) {
+    if (target === 'instagram') obj.profileVisits = m.totalVisits;
+    else if (target === 'facebook') obj.pageVisitors = m.totalVisits;
+  }
 
   if (m.formatSplits.length > 0 && obj) {
     if (target === 'facebook') {
@@ -496,12 +554,29 @@ export function applyMetaCsvFilesToReport(
 ): { report: any; filesProcessed: string[] } {
   let report = baseReport;
   const filesProcessed: string[] = [];
-  const groups = groupMetaFilesByTag(files);
+
+  // Identical re-downloads ("Views.csv" and "Views(1).csv") are counted once.
+  const seen = new Set<string>();
+  const unique: any[] = [];
+  const duplicates: string[] = [];
+  for (const f of files || []) {
+    const key = `${String(f?.platform || '').toLowerCase()}|${String(f?.textContent || f?.dataUrl || '').trim()}`;
+    if (key.length > 1 && seen.has(key)) { duplicates.push(f?.name || 'file'); continue; }
+    seen.add(key);
+    unique.push(f);
+  }
+
+  const groups = groupMetaFilesByTag(unique);
   for (const [tag, group] of Object.entries(groups)) {
     const metrics = parseMetaCsvExports(group);
     if (metrics.filesProcessed.length === 0) continue;
     filesProcessed.push(...metrics.filesProcessed);
     report = applyMetaCsvToReport(report, metrics, requestedPlatforms, tag === 'untagged' ? undefined : (tag as 'facebook' | 'instagram'));
+  }
+  if (duplicates.length > 0) {
+    report.dataQuality = report.dataQuality || { isFallback: false, warnings: [], sources: [] };
+    report.dataQuality.warnings = report.dataQuality.warnings || [];
+    report.dataQuality.warnings.push(`Skipped ${duplicates.length} identical duplicate file${duplicates.length === 1 ? '' : 's'}: ${duplicates.join(', ')}.`);
   }
   return { report, filesProcessed };
 }

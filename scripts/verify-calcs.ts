@@ -5,7 +5,7 @@ import { reconcileAndHarmonizeReport as reconcile } from '../src/utils/reconcile
 import { classifyMetaCsvType, parseMetaCsvExports, applyMetaCsvToReport, applyMetaCsvFilesToReport } from '../src/utils/metaCsvParser';
 import { generateSynthesizedAgencyReport } from '../src/utils/reportSynthesizer';
 import { formatNumber, escapeDeep } from '../src/utils/formatters';
-import { detectPlatformFromFileName } from '../src/utils/fileUploadHelper';
+import { detectPlatformFromFileName, decodeTextBytes } from '../src/utils/fileUploadHelper';
 import { saveReportToHistory, calculateMoMDelta } from '../src/utils/auditTools';
 import { computeSummaryTotals } from '../src/utils/summaryMath';
 import { buildClientSideReport } from '../src/utils/clientFallback';
@@ -180,6 +180,74 @@ test('29 browser fallback = same pipeline: known metrics + CSV + reconcile, flag
   eq([r.instagram.followers, r.instagram.reach, r.youtube.subscribers, r.executiveSummary.overallReach], [12500, 10000, 2500, 40000]);
   eq(r.dataQuality.isFallback, true);
   if (!/offline/.test(r.dataQuality.warnings[0])) throw new Error('reason missing');
+});
+
+
+// ---- real-world Meta export layouts (title line, quoted sep line, BOM, UTF-16, CRLF, odd headers) ----
+const metaViews = '"Views"\n"sep=,"\n"Date","Primary"\n"2026-09-01T00:00:00","1000"\n"2026-09-02T00:00:00","1,500"\n';
+const asBytes = (txt: string, enc: 'utf8bom' | 'utf16bom' | 'utf16nobom' | 'utf16be') => {
+  if (enc === 'utf8bom') return new Uint8Array([0xef, 0xbb, 0xbf, ...Buffer.from(txt, 'utf8')]);
+  const le = Buffer.from(txt, 'utf16le');
+  if (enc === 'utf16bom') return new Uint8Array([0xff, 0xfe, ...le]);
+  if (enc === 'utf16nobom') return new Uint8Array(le);
+  const be = Buffer.from(le); be.swap16(); return new Uint8Array([0xfe, 0xff, ...be]);
+};
+test('30 Meta layout: title line + quoted "sep=," on line 2 + ISO timestamps + quoted "1,500"', () => {
+  eq(parseMetaCsvExports([{ name: 'Views.csv', textContent: metaViews }]).totalViews, 2500);
+});
+for (const enc of ['utf8bom', 'utf16bom', 'utf16nobom', 'utf16be'] as const) {
+  test(`31 encoding ${enc}: decoded and parsed to the same totals`, () => {
+    const text = decodeTextBytes(asBytes(metaViews, enc));
+    eq(parseMetaCsvExports([{ name: 'Views.csv', textContent: text }]).totalViews, 2500);
+  });
+}
+test('32 even if garbled UTF-16 text (NUL bytes) reaches the parser, it still reads the numbers', () => {
+  const garbled = Buffer.from(metaViews, 'utf16le').toString('utf8');
+  eq(parseMetaCsvExports([{ name: 'Views.csv', textContent: garbled }]).totalViews, 2500);
+});
+test('33 CRLF and old-Mac CR line endings', () => {
+  eq(parseMetaCsvExports([{ name: 'Views.csv', textContent: metaViews.replace(/\n/g, '\r\n') }]).totalViews, 2500);
+  eq(parseMetaCsvExports([{ name: 'Views.csv', textContent: metaViews.replace(/\n/g, '\r') }]).totalViews, 2500);
+});
+test('34 unexpected header names still work through the numeric-column fallback', () => {
+  const m = parseMetaCsvExports([{ name: 'Interactions.csv', textContent: 'Date,Count\n2026-09-01,40\n2026-09-02,60\n' }]);
+  eq(m.totalInteractions, 100);
+});
+test('35 failures print what was actually seen (columns + first data row)', () => {
+  const m = parseMetaCsvExports([{ name: 'Link clicks.csv', textContent: 'Date,Notes\n2026-09-01,none\n' }]);
+  if (!m.warnings?.some((w) => /columns found: "date", "notes"; first data row: "2026-09-01", "none"/.test(w))) throw new Error(JSON.stringify(m.warnings));
+});
+test('36 Visits.csv is recognised and applied to the right field (IG profileVisits)', () => {
+  eq(classifyMetaCsvType('Visits.csv', ''), 'visits');
+  const base = generateSynthesizedAgencyReport({ clientName: 'T', reportPeriod: 'P', platforms: ['instagram'] });
+  const { report } = applyMetaCsvFilesToReport(base, [{ name: 'Visits.csv', platform: 'instagram', textContent: 'Date,Primary\n2026-09-01,7\n2026-09-02,5\n' }], ['instagram']);
+  eq(report.instagram.profileVisits, 12);
+});
+test('37 identical re-downloads ("Views.csv" + "Views(1).csv") are counted once, and say so', () => {
+  const base = generateSynthesizedAgencyReport({ clientName: 'T', reportPeriod: 'P', platforms: ['instagram'] });
+  const f = { platform: 'instagram', textContent: 'Date,Primary\n2026-09-01,100\n' };
+  const { report } = applyMetaCsvFilesToReport(base, [{ name: 'Views.csv', ...f }, { name: 'Views(1).csv', ...f }], ['instagram']);
+  const out = reconcile(report, ['instagram'], {});
+  eq(out.instagram.reach, 100);
+  if (!out.dataQuality.warnings.some((w: string) => /Skipped 1 identical duplicate/.test(w))) throw new Error('no duplicate note');
+});
+test('38 two DIFFERENT untagged Views files are not mixed: second is skipped with a tagging hint', () => {
+  const m = parseMetaCsvExports([{ name: 'Views.csv', textContent: 'Date,Primary\n2026-09-01,100\n' }, { name: 'Views(1).csv', textContent: 'Date,Primary\n2026-09-01,900\n' }]);
+  eq(m.totalViews, 100); if (!m.warnings?.some((w) => /Upload each platform's files under that platform's own tag/.test(w))) throw new Error('no hint');
+});
+test('39 full real-world set for one tagged platform gives sensible totals', () => {
+  const base = generateSynthesizedAgencyReport({ clientName: 'T', reportPeriod: 'P', platforms: ['facebook'], knownMetrics: { facebookFollowers: '3,400' } });
+  const mk = (name: string, body: string) => ({ name, platform: 'facebook', textContent: '"' + name.replace('.csv', '') + '"\n"sep=,"\n"Date","Primary"\n' + body });
+  const { report } = applyMetaCsvFilesToReport(base, [
+    mk('Views.csv', '"2026-09-01T00:00:00","6000"\n"2026-09-02T00:00:00","4000"\n'),
+    mk('Interactions.csv', '"2026-09-01T00:00:00","300"\n"2026-09-02T00:00:00","200"\n'),
+    mk('Link clicks.csv', '"2026-09-01T00:00:00","20"\n"2026-09-02T00:00:00","15"\n'),
+    mk('Visits.csv', '"2026-09-01T00:00:00","50"\n"2026-09-02T00:00:00","25"\n'),
+    mk('Viewers.csv', '"2026-09-01T00:00:00","900"\n"2026-09-02T00:00:00","950"\n'),
+  ], ['facebook']);
+  const out = reconcile(report, ['facebook'], { facebookFollowers: '3,400' });
+  eq([out.facebook.followers, out.facebook.reachOrganic, out.facebook.pageVisitors, out.executiveSummary.overallReach], [3400, 10000, 75, 10000]);
+  eq(out.executiveSummary.overallEngagementRate, 5, 'interactions/views');
 });
 
 console.log(`\nSUMMARY: ${pass} PASSED, ${fail} FAILED out of ${pass + fail}`);

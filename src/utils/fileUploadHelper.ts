@@ -40,6 +40,24 @@ export function compressImage(file: File, maxWidth = 2200, quality = 0.95): Prom
   });
 }
 
+/** Decodes bytes the way spreadsheets do: honours UTF-8/UTF-16 BOMs and detects BOM-less UTF-16 (Meta exports are sometimes UTF-16). */
+export function decodeTextBytes(bytes: Uint8Array): string {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes.subarray(2));
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return new TextDecoder('utf-8').decode(bytes.subarray(3));
+  // BOM-less UTF-16: lots of zero bytes in every second position
+  const probe = Math.min(bytes.length, 400);
+  let zerosEven = 0, zerosOdd = 0;
+  for (let i = 0; i < probe; i++) if (bytes[i] === 0) (i % 2 === 0 ? zerosEven++ : zerosOdd++);
+  if (zerosOdd > probe / 4 && zerosEven === 0) return new TextDecoder('utf-16le').decode(bytes);
+  if (zerosEven > probe / 4 && zerosOdd === 0) return new TextDecoder('utf-16be').decode(bytes);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+export async function readTextFile(file: File): Promise<string> {
+  return decodeTextBytes(new Uint8Array(await file.arrayBuffer()));
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -84,7 +102,7 @@ export async function processUploadedFile(file: File, targetPlatform?: PlatformT
   let dataUrl: string;
 
   if (fileType === 'csv') {
-    textContent = await file.text();
+    textContent = await readTextFile(file);
     // For CSV, create dataUrl representation for consistency
     const encoded = encodeURIComponent(textContent);
     dataUrl = `data:text/csv;charset=utf-8,${encoded}`;

@@ -261,7 +261,7 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs">
             {calculatedReachMoM === null ? (
-              <span className="text-stone-400 font-normal">— MoM (no prior-period data)</span>
+              <span className="text-stone-400 font-normal">— MoM n/a</span>
             ) : (
               <span className={`inline-flex items-center font-semibold ${calculatedReachMoM >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                 {calculatedReachMoM >= 0 ? (
@@ -293,7 +293,7 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs">
             {summary.overallEngagementPrevDelta === 0 ? (
-              <span className="text-stone-400 font-normal">— MoM (no prior-period data)</span>
+              <span className="text-stone-400 font-normal">— MoM n/a</span>
             ) : (
               <span className={`inline-flex items-center font-semibold ${summary.overallEngagementPrevDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                 {summary.overallEngagementPrevDelta >= 0 ? (
@@ -306,7 +306,7 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
             )}
             <span className="text-stone-300">·</span>
             <span className="text-stone-500">
-              {totals.engagementGaps ? 'Reach-weighted (some channels n/a)' : 'Reach-weighted'}
+              {totals.engagementGaps ? 'Weighted · some n/a' : 'Weighted'}
             </span>
           </div>
         </div>
