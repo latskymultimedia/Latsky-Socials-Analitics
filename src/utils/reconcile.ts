@@ -1,5 +1,6 @@
 import { parseMetric } from './parseMetric';
 import { VALID_PLATFORMS, PLATFORM_LABELS, normalizePlatforms, getReach, setReach } from './platforms';
+import { computeSummaryTotals } from './summaryMath';
 
 /**
  * Single source of truth for report maths.
@@ -136,31 +137,15 @@ export function reconcileAndHarmonizeReport(
 
   report.crossPlatformOverview.summaryTable = VALID_PLATFORMS.map((p) => rows[p]);
 
-  // (4) totals: deterministic, from active rows only
+  // (4) totals: deterministic, from active rows only (shared with the UI via summaryMath)
   if (!report.executiveSummary) report.executiveSummary = {};
-  const activeRows = VALID_PLATFORMS.filter(isActive).map((p) => rows[p]).filter((r) => r.followers > 0 || r.reach > 0);
+  const totals = computeSummaryTotals(VALID_PLATFORMS.filter(isActive).map((p) => rows[p]));
+  report.executiveSummary.overallReach = totals.reach;
+  report.executiveSummary.overallEngagementRate = totals.engagementRate;
+  if (totals.engagementGaps) warn('Some platforms have reach but no engagement rate. They are excluded from the weighted engagement rate.');
 
-  const totalReach = activeRows.reduce((s, r) => s + r.reach, 0);
-  report.executiveSummary.overallReach = totalReach;
-
-  // reach-weighted engagement, over platforms that actually reported an engagement rate
-  const withEng = activeRows.filter((r) => r.reach > 0 && r.engagementRate > 0);
-  const engWeight = withEng.reduce((s, r) => s + r.reach, 0);
-  report.executiveSummary.overallEngagementRate = engWeight > 0
-    ? Number((withEng.reduce((s, r) => s + r.reach * r.engagementRate, 0) / engWeight).toFixed(1))
-    : 0;
-  if (activeRows.some((r) => r.reach > 0 && r.engagementRate === 0) && engWeight > 0) {
-    warn('Some platforms have reach but no engagement rate. They are excluded from the weighted engagement rate.');
-  }
-
-  // overall deltas must agree with the recomputed total, so derive them from per-platform deltas or clear them
-  const reaching = activeRows.filter((r) => r.reach > 0);
-  if (reaching.length > 0 && reaching.every((r) => r.reachDelta !== 0 && r.reachDelta > -100)) {
-    const prev = reaching.reduce((s, r) => s + r.reach / (1 + r.reachDelta / 100), 0);
-    report.executiveSummary.overallReachPrevDelta = prev > 0 ? Number((((totalReach - prev) / prev) * 100).toFixed(1)) : 0;
-  } else {
-    report.executiveSummary.overallReachPrevDelta = 0;
-  }
+  // Overall deltas must agree with the recomputed total: derive from per-platform deltas, otherwise 0 (= "no comparison").
+  report.executiveSummary.overallReachPrevDelta = totals.reachMoM ?? 0;
   report.executiveSummary.overallReachYoYDelta = 0;
   report.executiveSummary.overallEngagementPrevDelta = 0;
 

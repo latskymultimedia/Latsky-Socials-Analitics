@@ -7,6 +7,8 @@ import { generateSynthesizedAgencyReport } from '../src/utils/reportSynthesizer'
 import { formatNumber, escapeDeep } from '../src/utils/formatters';
 import { detectPlatformFromFileName } from '../src/utils/fileUploadHelper';
 import { saveReportToHistory, calculateMoMDelta } from '../src/utils/auditTools';
+import { computeSummaryTotals } from '../src/utils/summaryMath';
+import { buildClientSideReport } from '../src/utils/clientFallback';
 
 // minimal localStorage for node
 const store: Record<string, string> = {};
@@ -153,6 +155,31 @@ test('25 end-to-end: known metrics + one CSV + reconcile give consistent totals'
   eq([out.instagram.followers, out.instagram.reach, out.instagram.engagementRate, out.youtube.subscribers, out.youtube.views], [1500, 10000, 5, 2000, 30000]);
   eq(out.executiveSummary.overallReach, 40000);
   eq(out.executiveSummary.overallEngagementRate, 5, 'weighted over platforms that reported engagement');
+});
+
+
+test('26 summaryMath: selecting a platform with NO data does not fall back to the other platforms\' reach', () => {
+  const t = computeSummaryTotals([row('instagram', { followers: 10, reach: 5000, engagementRate: 4 }), row('youtube')], ['youtube']);
+  eq([t.reach, t.engagementRate, t.reachMoM], [0, 0, null]);
+});
+test('27 summaryMath: MoM is weighted from per-platform deltas, null when any reaching platform lacks one', () => {
+  const a = computeSummaryTotals([row('instagram', { followers: 1, reach: 1100, reachDelta: 10 }), row('youtube', { followers: 1, reach: 2200, reachDelta: 10 })]);
+  eq(a.reachMoM, 10);
+  const b = computeSummaryTotals([row('instagram', { followers: 1, reach: 1100, reachDelta: 10 }), row('youtube', { followers: 1, reach: 2200, reachDelta: 0 })]);
+  eq(b.reachMoM, null);
+  // old UI: unweighted average over rows incl. empty ones would have reported 3.3 here
+});
+test('28 summaryMath: platforms with no engagement rate do not dilute the weighted rate', () => {
+  const t = computeSummaryTotals([row('instagram', { followers: 1, reach: 1000, engagementRate: 6 }), row('youtube', { followers: 1, reach: 9000, engagementRate: 0 })]);
+  eq(t.engagementRate, 6); eq(t.engagementGaps, true);
+});
+test('29 browser fallback = same pipeline: known metrics + CSV + reconcile, flagged as fallback', () => {
+  const r: any = buildClientSideReport(
+    { clientName: 'T', reportPeriod: 'P', platforms: ['instagram', 'youtube'], knownMetrics: { instagramFollowers: '12,500', youtubeSubscribers: '2.5K', youtubeReach: '30K' } },
+    [{ name: 'Viewers.csv', platform: 'instagram', fileType: 'csv', textContent: 'Total viewers\n10,000\n' }], 'offline');
+  eq([r.instagram.followers, r.instagram.reach, r.youtube.subscribers, r.executiveSummary.overallReach], [12500, 10000, 2500, 40000]);
+  eq(r.dataQuality.isFallback, true);
+  if (!/offline/.test(r.dataQuality.warnings[0])) throw new Error('reason missing');
 });
 
 console.log(`\nSUMMARY: ${pass} PASSED, ${fail} FAILED out of ${pass + fail}`);

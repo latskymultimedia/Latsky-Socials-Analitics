@@ -236,6 +236,13 @@ export interface IndustryWebIntel {
   }[];
 }
 
+export interface DataQuality {
+  /** true = the AI analysis did not run/return, so the report holds only CSV and manually entered figures */
+  isFallback: boolean;
+  warnings: string[];
+  sources: Array<'user' | 'csv' | 'ai' | 'none' | string>;
+}
+
 export interface SocialReportData {
   id: string;
   clientName: string;
@@ -391,7 +398,11 @@ export interface SocialReportData {
   uploadedScreenshots: UploadedScreenshot[];
 
   // Raw metrics appendix for audit logging & historical tracking
-  appendixRawMetrics?: Record<string, any>;
+  // (array of {metric,value,notes}; older saved sessions may still hold a plain object)
+  appendixRawMetrics?: Array<{ metric: string; value: string; notes?: string }> | Record<string, any>;
+
+  // Where the numbers came from and what could not be verified (filled in by the server / browser fallback)
+  dataQuality?: DataQuality;
 }
 
 export interface ClassifiedUpload {

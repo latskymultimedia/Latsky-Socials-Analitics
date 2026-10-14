@@ -10,6 +10,7 @@ import {
   Share2 
 } from 'lucide-react';
 import { TikTokIcon } from './icons/TikTokIcon';
+import { computeSummaryTotals } from '../utils/summaryMath';
 import { PlatformSummaryRow, PlatformType, SocialReportData } from '../types/report';
 import { formatNumber, formatPercent, getPlatformColor } from '../utils/formatters';
 
@@ -43,12 +44,10 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
   const totalFollowers = activeRows.reduce((acc, r) => acc + (r.followers || 0), 0);
   const totalFollowersDelta = activeRows.reduce((acc, r) => acc + (r.followersDelta || 0), 0);
   const totalReach = activeRows.reduce((acc, r) => acc + (r.reach || 0), 0);
-  const avgReachDelta = activeRows.length > 0
-    ? Number((activeRows.reduce((acc, r) => acc + (r.reachDelta || 0), 0) / activeRows.length).toFixed(1))
-    : 0;
-  const weightedEngRate = totalReach > 0
-    ? Number((activeRows.reduce((acc, r) => acc + ((r.reach || 0) * (r.engagementRate || 0)), 0) / totalReach).toFixed(1))
-    : 0;
+  const summaryTotals = computeSummaryTotals(activeRows);
+  const reachMoM = summaryTotals.reachMoM; // null = no comparable prior period
+  const weightedEngRate = summaryTotals.engagementRate;
+  const reportingChannels = activeRows.filter((r) => (r.followers || 0) > 0 || (r.reach || 0) > 0).length;
   const totalPostsCount = activeRows.reduce((acc, r) => acc + (r.totalPosts || 0), 0);
 
   const getPlatformIcon = (platform: PlatformType) => {
@@ -315,9 +314,13 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
                   {totalReach >= 10000 && (
                     <span className="text-[10px] text-stone-500 font-mono">({formatNumber(totalReach)})</span>
                   )}
-                  <span className={`text-[11px] font-bold ${avgReachDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                    {formatPercent(avgReachDelta, true)} avg
-                  </span>
+                  {reachMoM === null ? (
+                    <span className="text-[11px] text-stone-400 font-normal">—</span>
+                  ) : (
+                    <span className={`text-[11px] font-bold ${reachMoM >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      {formatPercent(reachMoM, true)} MoM
+                    </span>
+                  )}
                 </div>
               </td>
               <td className="px-4 py-3 whitespace-nowrap">
@@ -327,7 +330,7 @@ export const CrossPlatformTable: React.FC<CrossPlatformTableProps> = ({
                 </div>
               </td>
               <td className="px-4 py-3 text-stone-600 text-[11px] font-normal italic">
-                All 5 core channels integrated
+                {reportingChannels} of {activeRows.length} selected channel{activeRows.length === 1 ? '' : 's'} reporting data
               </td>
               <td className="px-4 py-3 whitespace-nowrap text-right font-extrabold text-stone-900">
                 {totalPostsCount} posts

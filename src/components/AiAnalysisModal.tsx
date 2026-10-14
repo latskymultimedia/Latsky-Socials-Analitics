@@ -25,8 +25,8 @@ import {
 import { TikTokIcon } from './icons/TikTokIcon';
 import { PlatformType, SocialReportData, UploadedScreenshot, FileUploadType } from '../types/report';
 import { processUploadedFile, formatFileSize } from '../utils/fileUploadHelper';
-import { generateSynthesizedAgencyReport } from '../utils/reportSynthesizer';
-import { parseMetaCsvExports, applyMetaCsvToReport } from '../utils/metaCsvParser';
+import { buildClientSideReport } from '../utils/clientFallback';
+import { parseMetric } from '../utils/parseMetric';
 import { ScreengrabGuide } from './ScreengrabGuide';
 import { ScreengrabPromptItem } from '../types/screengrabPrompts';
 
@@ -226,7 +226,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
         : (activePlatformsFound.length > 0 ? activePlatformsFound : ['youtube', 'instagram', 'tiktok', 'linkedin', 'facebook']);
 
       const filteredKnownMetrics = Object.fromEntries(
-        Object.entries(knownMetrics).filter(([_, v]) => v.trim() !== '' && !isNaN(Number(v)))
+        Object.entries(knownMetrics).filter(([_, v]) => v.trim() !== '' && parseMetric(v) !== null)
       );
 
       const payload = {
@@ -281,23 +281,8 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
       } catch (apiError) {
         console.warn("Backend API unavailable on static hosting, switching to client-side synthesis...", apiError);
 
-        // CLIENT-SIDE FALLBACK: Generates the report instantly in the browser
-        const rawLocal = generateSynthesizedAgencyReport({
-          clientName: payload.clientName,
-          clientSubtitle: payload.clientSubtitle,
-          reportPeriod: payload.reportPeriod,
-          goals: payload.goals,
-          notes: payload.notes,
-          platforms: payload.platforms,
-          imageCount: screenshots.length,
-          imageNames: screenshots.map((s) => s.name),
-          knownMetrics: payload.knownMetrics,
-        });
-
-        const csvMetrics = parseMetaCsvExports(screenshots);
-        const localReport = csvMetrics.filesProcessed.length > 0
-          ? applyMetaCsvToReport(rawLocal, csvMetrics, payload.platforms)
-          : rawLocal;
+        // CLIENT-SIDE FALLBACK: same pipeline as the server (CSV + known metrics + reconcile), no AI
+        const localReport = buildClientSideReport(payload, screenshots, (apiError as any)?.message);
 
         onReportGenerated(localReport, screenshots);
         onClose();
@@ -322,7 +307,7 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
       : (activePlatformsFound.length > 0 ? activePlatformsFound : ['youtube', 'instagram', 'tiktok', 'linkedin', 'facebook']);
 
     const filteredKnownMetrics = Object.fromEntries(
-      Object.entries(knownMetrics).filter(([_, v]) => v.trim() !== '' && !isNaN(Number(v)))
+      Object.entries(knownMetrics).filter(([_, v]) => v.trim() !== '' && parseMetric(v) !== null)
     );
 
     const payload = {
@@ -334,6 +319,10 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
       platforms: platformsToReport,
       imageCount: screenshots.length,
       imageNames: screenshots.map((s) => s.name),
+      // CSV tables are sent so the server applies them exactly like the browser fallback does
+      images: screenshots
+        .filter((s) => s.fileType === 'csv')
+        .map((s) => ({ name: s.name, platform: s.platform, fileType: s.fileType, textContent: s.textContent })),
       knownMetrics: filteredKnownMetrics,
     };
 
@@ -371,23 +360,8 @@ export const AiAnalysisModal: React.FC<AiAnalysisModalProps> = ({
     } catch (apiError) {
       console.warn("Backend API unavailable on Vercel static hosting, switching to client-side synthesis...", apiError);
 
-      // CLIENT-SIDE FALLBACK: Generates the report instantly in the browser
-      const rawLocal = generateSynthesizedAgencyReport({
-        clientName: payload.clientName,
-        clientSubtitle: payload.clientSubtitle,
-        reportPeriod: payload.reportPeriod,
-        goals: payload.goals,
-        notes: payload.notes,
-        platforms: payload.platforms,
-        imageCount: screenshots.length,
-        imageNames: screenshots.map((s) => s.name),
-        knownMetrics: payload.knownMetrics,
-      });
-
-      const csvMetrics = parseMetaCsvExports(screenshots);
-      const localReport = csvMetrics.filesProcessed.length > 0
-        ? applyMetaCsvToReport(rawLocal, csvMetrics, payload.platforms)
-        : rawLocal;
+      // CLIENT-SIDE FALLBACK: same pipeline as the server (CSV + known metrics + reconcile)
+      const localReport = buildClientSideReport(payload, screenshots, (apiError as any)?.message);
 
       onReportGenerated(localReport, screenshots);
       onClose();

@@ -319,20 +319,20 @@ export function createNewClientReport(
         ],
         bestPostingSchedule: {
           bestDays: ['Tuesday', 'Thursday'],
-          bestTimeWindow: '18:00 – 20:30 GMT',
-          insight: 'Standard high-engagement window.'
+          bestTimeWindow: 'Awaiting data',
+          insight: 'Upload post history to compute optimal timing.'
         }
       },
       audienceInsights: {
         growthQuality: 'Awaiting uploads to analyze audience acquisition sources and community alignment.',
-        organicVsPaidRatio: '100% Organic Baseline',
+        organicVsPaidRatio: 'Not provided',
         demographicShifts: 'Awaiting data.'
       },
       competitiveBenchmark: {
         industryBenchmarkAvg: {
-          engagementRate: '2.5% Baseline',
-          reachGrowth: '+8% Baseline',
-          summary: 'Benchmark standards'
+          engagementRate: 'N/A',
+          reachGrowth: 'N/A',
+          summary: 'Add competitor links to generate a benchmark.'
         },
         competitors: []
       },

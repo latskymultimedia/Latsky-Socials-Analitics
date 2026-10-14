@@ -1,5 +1,7 @@
 import { SocialReportData, PlatformType, ActionRecommendation, TacticalSuggestion } from '../types/report';
-import { formatNumber, formatPercent, escapeDeep } from './formatters';
+import { formatNumber, formatPercent, escapeHtml, escapeDeep } from './formatters';
+
+export { escapeHtml };
 
 /**
  * Generates a clean, standalone, printable agency HTML report for the client.
@@ -11,14 +13,15 @@ export function generateStandaloneHtmlReport(
   rawReport: SocialReportData,
   platformFilter?: PlatformType | 'overall'
 ): string {
-  // Every string in the report (client name, takeaways, AI text...) is HTML-escaped once, here, before it reaches a template.
+  // Every string in the report (client name, takeaways, AI text...) is HTML-escaped ONCE, here, before it reaches a template.
   const report = escapeDeep(rawReport) as SocialReportData;
   const isPlatformSpecific = Boolean(platformFilter && platformFilter !== 'overall');
   const targetPlatform: PlatformType = isPlatformSpecific ? (platformFilter as PlatformType) : 'general';
 
+  const clientEscaped = report.clientName; // already escaped by escapeDeep above
   const title = isPlatformSpecific
-    ? `${report.clientName} - ${targetPlatform.toUpperCase()} Performance & Growth Blueprint`
-    : `${report.clientName} - Monthly Social Performance Intelligence Report`;
+    ? `${clientEscaped} - ${targetPlatform.toUpperCase()} Performance & Growth Blueprint`
+    : `${clientEscaped} - Monthly Social Performance Intelligence Report`;
 
   const rows = report.crossPlatformOverview?.summaryTable || [];
   const recs = report.recommendations?.actionableItems || [];
@@ -1200,20 +1203,26 @@ export function generateStandaloneHtmlReport(
       ${report.clientLogoUrl ? `<img src="${report.clientLogoUrl}" alt="Logo" class="logo" />` : ''}
     </div>
 
+    ${(report.dataQuality && ((report.dataQuality.warnings || []).length > 0 || report.dataQuality.isFallback)) ? `
+    <div style="margin: 0 0 16px; padding: 12px 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 11px; color: #78350f;">
+      <strong>Data notes:</strong>${report.dataQuality.isFallback ? ' AI analysis did not run. Figures come only from uploaded CSV data and values entered manually.' : ''}
+      <ul style="margin: 6px 0 0 16px;">${(report.dataQuality.warnings || []).map((w) => `<li>${w}</li>`).join('')}</ul>
+    </div>` : ''}
+
     <!-- 01. Executive Summary -->
     <div class="section">
       <div class="section-title">01. Executive Summary</div>
       
       <div class="grid-2">
         <div class="metric-card">
-          <div class="metric-label">Cross-Platform Reach</div>
+          <div class="metric-label">Cross-Platform Reach (sum of platforms, not de-duplicated)</div>
           <div class="metric-val">${formatNumber(report.executiveSummary.overallReach)}</div>
-          <div class="metric-sub">${formatPercent(report.executiveSummary.overallReachPrevDelta, true)} MoM · ${formatPercent(report.executiveSummary.overallReachYoYDelta, true)} YoY</div>
+          <div class="metric-sub">${[report.executiveSummary.overallReachPrevDelta ? `${formatPercent(report.executiveSummary.overallReachPrevDelta, true)} MoM` : '', report.executiveSummary.overallReachYoYDelta ? `${formatPercent(report.executiveSummary.overallReachYoYDelta, true)} YoY` : ''].filter(Boolean).join(' · ') || 'No prior-period comparison'}</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Avg Engagement Rate</div>
+          <div class="metric-label">Engagement Rate (reach-weighted)</div>
           <div class="metric-val">${formatPercent(report.executiveSummary.overallEngagementRate)}</div>
-          <div class="metric-sub">${formatPercent(report.executiveSummary.overallEngagementPrevDelta, true)} MoM</div>
+          <div class="metric-sub">${report.executiveSummary.overallEngagementPrevDelta ? `${formatPercent(report.executiveSummary.overallEngagementPrevDelta, true)} MoM` : 'Reach-weighted'}</div>
         </div>
       </div>
 
@@ -1229,11 +1238,11 @@ export function generateStandaloneHtmlReport(
       <div class="grid-2" style="margin-top: 14px;">
         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px;">
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #166534; margin-bottom: 3px;">Top Win</div>
-          <div style="font-size: 12px; color: #14532d;">${report.executiveSummary.keyWins[0] || 'Strong reach growth'}</div>
+          <div style="font-size: 12px; color: #14532d;">${report.executiveSummary.keyWins[0] || 'None recorded'}</div>
         </div>
         <div style="background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px;">
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #92400e; margin-bottom: 3px;">Watch Item</div>
-          <div style="font-size: 12px; color: #78350f;">${report.executiveSummary.watchItem || 'Monitor follower churn'}</div>
+          <div style="font-size: 12px; color: #78350f;">${report.executiveSummary.watchItem || 'None recorded'}</div>
         </div>
       </div>
     </div>
@@ -1624,7 +1633,7 @@ export function generateStandaloneHtmlReport(
             07. Competitive & Sector Benchmarks
           </div>
           <div style="font-size: 11px; margin-bottom: 8px;">
-            <strong>Sector Baseline: </strong>${report.competitiveBenchmark?.industryBenchmarkAvg?.engagementRate || 'Standard'} (${report.competitiveBenchmark?.industryBenchmarkAvg?.reachGrowth || '+5%'})
+            <strong>Sector Baseline: </strong>${report.competitiveBenchmark?.industryBenchmarkAvg?.engagementRate || 'Not provided'} (${report.competitiveBenchmark?.industryBenchmarkAvg?.reachGrowth || 'Not provided'})
             <div style="color: #334155; margin-top: 2px;">${report.competitiveBenchmark?.industryBenchmarkAvg?.summary || 'Benchmarked against industry standards.'}</div>
           </div>
           ${report.competitiveBenchmark?.competitors && report.competitiveBenchmark.competitors.length > 0 ? `

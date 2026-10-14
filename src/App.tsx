@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { initialReportState, verandertReport, artisanRetreatReport, executiveIntelligenceReport } from './data/mockReports';
+import { initialReportState, verandertReport, artisanRetreatReport } from './data/mockReports';
 import { 
   PlatformType, 
   SocialReportData, 
@@ -16,6 +16,7 @@ import { GrowthRoadmap } from './components/GrowthRoadmap';
 import { ScreengrabGuide } from './components/ScreengrabGuide';
 import { StandalonePlatformReport } from './components/StandalonePlatformReport';
 import { ExecutiveSummarySection } from './components/ExecutiveSummarySection';
+import { DataQualityBanner } from './components/DataQualityBanner';
 import { GoalsContextSection } from './components/GoalsContextSection';
 import { CrossPlatformTable } from './components/CrossPlatformTable';
 import { PlatformBreakdownSection } from './components/PlatformBreakdownSection';
@@ -207,10 +208,8 @@ export default function App() {
     }
   };
 
-  const handleLoadPreset = (presetKey: 'verandert' | 'retreat' | 'intelligence') => {
-    const preset = presetKey === 'intelligence' 
-      ? executiveIntelligenceReport 
-      : presetKey === 'retreat' 
+  const handleLoadPreset = (presetKey: 'verandert' | 'retreat') => {
+    const preset = presetKey === 'retreat' 
       ? artisanRetreatReport 
       : verandertReport;
     setReport(preset);
@@ -458,6 +457,8 @@ export default function App() {
                 <span>Generated {new Date().toLocaleDateString()}</span>
               </div>
             </div>
+
+            <DataQualityBanner report={report} />
 
             {/* 1. Executive Summary */}
             <ExecutiveSummarySection

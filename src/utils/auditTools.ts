@@ -31,7 +31,8 @@ export function calculateMoMDelta(currentReach: number, clientName?: string) {
   try {
     const all = JSON.parse(localStorage.getItem('latsky_audit_history') || '[]');
     // only compare a client with ITS OWN earlier report (history[0] is the report just saved)
-    const history = clientName ? all.filter((h: any) => h.clientName === clientName) : all;
+    const norm = (v: any) => String(v ?? '').toLowerCase().trim();
+    const history = clientName ? all.filter((h: any) => norm(h.clientName) === norm(clientName)) : all;
     if (history.length < 2) return { deltaPercent: 0, hasHistory: false };
 
     const previousReach = Number(history[1].reach);

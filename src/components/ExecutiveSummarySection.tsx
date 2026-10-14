@@ -14,6 +14,7 @@ import {
   Facebook,
   Sparkles
 } from 'lucide-react';
+import { computeSummaryTotals } from '../utils/summaryMath';
 import { TikTokIcon } from './icons/TikTokIcon';
 import { PlatformType, SocialReportData } from '../types/report';
 import { formatNumber, formatPercent } from '../utils/formatters';
@@ -93,34 +94,11 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
   // Filtered rows for active platforms
   const filteredRows = summaryTable.filter((r) => activePlatforms.includes(r.platform));
 
-  // Dynamic calculations based on selected platforms
-  const sumFilteredReach = filteredRows.reduce((acc, r) => acc + (r.reach || 0), 0);
-  const calculatedReach = sumFilteredReach > 0 ? sumFilteredReach : summary.overallReach;
-
-  const calculatedReachMoM = filteredRows.length > 0
-    ? Number(
-        (
-          filteredRows.reduce((acc, r) => acc + (r.reachDelta || 0), 0) /
-          filteredRows.length
-        ).toFixed(1)
-      )
-    : summary.overallReachPrevDelta;
-
-  const calculatedEngagementRate = sumFilteredReach > 0
-    ? Number(
-        (
-          filteredRows.reduce((acc, r) => acc + ((r.reach || 0) * (r.engagementRate || 0)), 0) /
-          sumFilteredReach
-        ).toFixed(1)
-      )
-    : filteredRows.length > 0
-    ? Number(
-        (
-          filteredRows.reduce((acc, r) => acc + (r.engagementRate || 0), 0) /
-          filteredRows.length
-        ).toFixed(1)
-      )
-    : summary.overallEngagementRate;
+  // Dynamic calculations based on selected platforms (shared maths: same numbers as the server and the table)
+  const totals = computeSummaryTotals(filteredRows);
+  const calculatedReach = totals.reach;
+  const calculatedReachMoM = totals.reachMoM; // null = no comparable prior period
+  const calculatedEngagementRate = totals.engagementRate;
 
   const calculatedFollowers = filteredRows.reduce(
     (acc, r) => acc + (r.followers || 0),
@@ -271,7 +249,7 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
         {/* Total Audience Reach */}
         <div className="p-4 rounded-lg bg-stone-50 border border-stone-200">
           <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
-            {isAllSelected ? 'Total Audience Reach' : 'Selected Platforms Reach'}
+            {isAllSelected ? 'Total Reach (sum of platforms)' : 'Selected Platforms Reach'}
           </div>
           <div className="mt-1 text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight flex items-baseline gap-2">
             <span>{calculatedReach.toLocaleString()}</span>
@@ -282,15 +260,19 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
             )}
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs">
-            <span className={`inline-flex items-center font-semibold ${calculatedReachMoM >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-              {calculatedReachMoM >= 0 ? (
-                <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
-              ) : (
-                <ArrowDownRight className="w-3.5 h-3.5 mr-0.5" />
-              )}
-              {formatPercent(calculatedReachMoM, true)} MoM
-            </span>
-            {isAllSelected && (
+            {calculatedReachMoM === null ? (
+              <span className="text-stone-400 font-normal">— MoM (no prior-period data)</span>
+            ) : (
+              <span className={`inline-flex items-center font-semibold ${calculatedReachMoM >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {calculatedReachMoM >= 0 ? (
+                  <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
+                ) : (
+                  <ArrowDownRight className="w-3.5 h-3.5 mr-0.5" />
+                )}
+                {formatPercent(calculatedReachMoM, true)} MoM
+              </span>
+            )}
+            {isAllSelected && summary.overallReachYoYDelta !== 0 && (
               <>
                 <span className="text-stone-300">·</span>
                 <span className="text-stone-500">
@@ -304,23 +286,27 @@ export const ExecutiveSummarySection: React.FC<ExecutiveSummarySectionProps> = (
         {/* Average Engagement Rate */}
         <div className="p-4 rounded-lg bg-stone-50 border border-stone-200">
           <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
-            Avg. Engagement Rate
+            Engagement Rate (reach-weighted)
           </div>
           <div className="mt-1 text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight">
             {calculatedEngagementRate}%
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs">
-            <span className={`inline-flex items-center font-semibold ${summary.overallEngagementPrevDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-              {summary.overallEngagementPrevDelta >= 0 ? (
-                <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
-              ) : (
-                <ArrowDownRight className="w-3.5 h-3.5 mr-0.5" />
-              )}
-              {formatPercent(summary.overallEngagementPrevDelta, true)} MoM
-            </span>
+            {summary.overallEngagementPrevDelta === 0 ? (
+              <span className="text-stone-400 font-normal">— MoM (no prior-period data)</span>
+            ) : (
+              <span className={`inline-flex items-center font-semibold ${summary.overallEngagementPrevDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {summary.overallEngagementPrevDelta >= 0 ? (
+                  <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
+                ) : (
+                  <ArrowDownRight className="w-3.5 h-3.5 mr-0.5" />
+                )}
+                {formatPercent(summary.overallEngagementPrevDelta, true)} MoM
+              </span>
+            )}
             <span className="text-stone-300">·</span>
             <span className="text-stone-500">
-              {isAllSelected ? 'Baseline ~2.4%' : `${activePlatforms.length} channel avg`}
+              {totals.engagementGaps ? 'Reach-weighted (some channels n/a)' : 'Reach-weighted'}
             </span>
           </div>
         </div>
